@@ -1,0 +1,97 @@
+Khan-Rubix: A Private Key Encryption Project
+Additional Info 
+Description 1.1
+
+Goal: Build a strong private key encryption program that can be distributed via flash drive or email and run on either windows or mac OS.
+
+Program supports two functions
+
+1. Encrypt
+Input:
+* Any input file (cleartext) of up to 12Mb
+* A key of up to 1Kb (min 64 bytes)
+Output:
+* Encrypted file with new filetype “.khn”
+
+2. Decrypt
+Input:
+* Encrypted file with filetype “.khn”
+* Corresponding key of up to 1Kb
+Output:
+* Decrypted file (cleartext) with original filetype suffix
+
+Assumptions:
+* A key of less than 1Kb may be used, but it will be padded to 1Kb using a hash function of the key provided to select where to start padding from string of pi digits
+* A key of more than 1Kb may be used, but it will be truncated beyond 1Kb
+* The encrypted file may be larger than the original cleartext file
+* The input file may be any format, filetype, or content (text, numeric, binary, white noise)
+* Users can either paste the key into an input area for the program from the OS clipboard or specify the filename of a local file
+* The input key will be any string, without content restriction.  It may be binary, it may be text, it may contain HTML or any special characters.
+* The program must be able to perform the encrypt function in 10 seconds or less on a 2.9 Ghz Intel Core i5 (or comparable)
+* The program must be able to perform the decrypt function i in 10 seconds or less on a 2.9 Ghz Intel Core i5 (or comparable)
+* Public domain code or freeware code may be used – source code for ALL must be part of the package
+* No proprietary or licensed code or libraries may be included in the program without specific authorization from the sponsor
+* None of the team members will export this code outside of the United States or cause it to be released into the public domain
+
+Building Blocks
+1. Huffman encoding routine (or comparable) that takes an input string and encodes/compresses it to non-byte boundaries.
+2. Routine to load an input string into a three-dimensional array of 256 x 256 x 256 where each element of the array is 1 byte (Called “Rubix Array”)
+3. The ability to pad/fill out a short key with binary data to make it 1K bytes long
+4. The ability to perform a frequency analysis of an arbitrarily large string (how many bytes match x00, how many match x01, … xFF) and put the answer into a 256 element array such that the first element array.0 is the most commonly occurring byte pattern, the second element array.1 is the second most commonly occurring byte, etc.  In the event of a tie, the byte with the lowest ordinal value will be first (x00 before x01), followed by the next tied byte.  /* This would support dynamic Huffman… may not be required */
+5. The ability to bit shift (with wrap around) rows, columns, and “drawers” (Z dimension) in the three-dimensional Rubix array (this is a logical requirement, it can and probably should be done on one dimension at a time at the machine level for efficiency sake.  When the time comes, check with Payson if you have performance problems with this and I’ll show you at least one way to do it somewhat efficiently).
+6. The ability to XOR a 1Kb string against a large linear array.
+7. A constant containing the first 10,000 digits of pi (available from the web) translated into binary (not character or hexadecimal representation).
+8. The ability to “shuffle” long integers (32 bit) into an array that is 16M integers long (explained below)
+9. The ability to unload the 256 x 256 x 256 Rubix array into a 16Mb string 
+10. The ability to create a file from a 16Mb string
+11. An array of 256 prime numbers > 1K  and < 1M (available from the web) These will be used as constants
+
+
+
+Process Encrypt
+1. Take input file and load into a linear array.  At the start of the array include information about the length of the string extracted from the file (4 bytes) and the file suffix.  Pad out information beyond the end of the string with random bytes from the original string to fill out the array to 16Mb. /* Avoids strong pattern marking end of cleartext */
+2. Take key and truncate or fill1 to make it a full 1K
+3. XOR the key against the array in 1K chunks (run down the full array)
+4. Perform Huffman encoding of resulting array, creating array’ /* implement last */
+5. Load array’ into the Rubix array
+6. For n = 0 to 1K-1
+a. Examine the low order two bits of keybyte.n
+b. Shift bits in Row.n right with wrap
+7. Repeat for Columns
+8. Repeat for “Drawers”
+9. Examine the 59th byte of the key (this constant should be user configurable).  Use this to select a constant from the random number array.
+10. Build the “Shuffle” array using the identified Prime
+a. Initialize all array elements to xFFFFFFFF
+b. Do x = 1 to 16M
+Examine Shuffle array(x * Prime)  
+     If empty (xFFFFFFFF) load with X, increment counter and continue
+Else search for next empty array slot and load with X, increment counter and continue
+/* this will build a map that says where the bytes from the Rubix array will go in the resulting string and should break adjacency.  There are probably more efficient ways to do this, I’m open.  Also, might calculate ahead of time for different primes and use as a constant */
+11. Using the Shuffle array as a recipe for where the bytes from the Rubix array will go, unload the Rubix array into the output string
+12. Create the output file from the output string.
+
+
+
+Process Decrypt (step references are from Encrypt)
+1. Take the input file and load into a linear array
+2. Perform step 2 to truncate or fill out the key
+3. Perform steps 9 & 10 to build the Shuffle map
+4. Reverse step 11 – move elements from the input array into the Rubix array
+5. Reverse step 8 shifting left /* drawers */
+6. Reverse step 7 shifting left /* columns */
+7. Reverse step 6 shifting left /* rows */
+8. Unload the Rubix array into array’
+9. Perform Huffman decoding to create array from array’ /* implement last */
+10. Perform encrypt step 3 (XOR)
+11. Extract string length and file suffix
+12. Create output file with correct suffix using string length
+
+1 Use the 29th and 37th bytes of the key (concatenated) as an index into Pi and take the rest of the key as a substring beginning at location 29||37 of Pi and running for the balance of the key length needed.  These values (29 & 37) should be established as constants that can be changed by the user.
+---------------
+
+------------------------------------------------------------
+
+---------------
+
+------------------------------------------------------------
+
