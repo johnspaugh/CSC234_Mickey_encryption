@@ -15,9 +15,9 @@
  * @param   key                     buffer to hold the key
  * @return  boolean
 */
-bool get_key(std::string input_file, std::vector<uint8_t>& key)
+bool get_key(std::string input_file, std::vector<uint8_t>& key_file_buffer)
 {
-    std::ifstream input(input_file, std::ios::binary);
+    std::ifstream input(input_file, std::ios::ate | std::ios::binary);
 
     if (!input.is_open())
     {
@@ -25,26 +25,28 @@ bool get_key(std::string input_file, std::vector<uint8_t>& key)
         return false;
     }
 
-    // copies all data into buffer
-    std::vector<uint8_t> key_buffer(std::istreambuf_iterator<char>(input), {});
-    std::cout << "tellg: " << input.tellg() << std::endl;
-
-    input.close();
-
-    size_t key_size = key_buffer.size();
+    std::ifstream::pos_type key_size = input.tellg();
     if (key_size < 64)
     {
         std::cerr << "Invalid key." << std::endl;
+        input.close();
         return false;
     }
 
-    key_buffer.resize(MAX_KEY_SIZE);
+    input.seekg(0);
+
+    key_file_buffer.resize(key_size);
+    input.read(reinterpret_cast<char*>(key_file_buffer.data()), static_cast<int>(key_size));
+    input.close();
+
+
+    key_file_buffer.resize(MAX_KEY_SIZE);
     if (key_size < MAX_KEY_SIZE)
     {
-        uint8_t start = ((key_buffer[HIGH_BYTE % key_size] * 10) + key_buffer[LOW_BYTE] % key_size);
-
-        std::copy(PI + start, PI + start + (MAX_KEY_SIZE - key_size), key_buffer.begin() + key_size);
+        uint8_t start = ((key_file_buffer[HIGH_BYTE % key_size] * 10) + key_file_buffer[LOW_BYTE] % key_size);
+        std::copy(PI + start, PI + start + (MAX_KEY_SIZE - key_size), key_file_buffer.begin() + key_size);
     }
+
 
     return true;
 }
@@ -122,6 +124,9 @@ bool read_file(std::string input_file, std::vector<uint8_t>& input_file_buffer)
     // write the file name to the end of the buffer
     input_file_buffer.insert(input_file_buffer.begin() + 4, input_file.begin(), input_file.end());
 
+    //TODO: fill remaining array with random noise
+    input_file_buffer.resize(SIXTEEN_MEGABYTES, '0');
+
     return true;
 }
 
@@ -183,6 +188,26 @@ void shift_z(char amount)
  * @return  int                     0 if successful, -1 otherwise
 */
 
+bool write_file(std::string output_file, std::vector<uint8_t> file_buffer)
+{
+    // Open the file in binary mode
+    std::ofstream outfile(output_file, std::ios::binary);
+
+    // Check if the file opened successfully
+    if (!outfile.is_open()) {
+        std::cerr << "Error opening file!" << std::endl;
+        return false;
+    }
+
+    // Write the data to the file
+    outfile.write(reinterpret_cast<char*>(file_buffer.data()), file_buffer.size());
+
+    // Close the file
+    outfile.close();
+
+    return true;
+}
+
 int main(int argc, char **argv)
 {
     std::map<std::string, std::string> command_line_options;
@@ -207,13 +232,15 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
+#ifndef DEBUG
     for (int i = 0; i < file_buffer.size(); i++)
         file_buffer[i] ^= key[i % MAX_KEY_SIZE];
+#endif
 
     //Build Huffman tree and generate codes
-    Node* root = buildHuffmanTree(byte_array);
-    std::map<unsigned char, std::string> codes;
-    generateCodes(root, "", codes);
+    //Node* root = buildHuffmanTree(byte_array);
+    //std::map<unsigned char, std::string> codes;
+    //generateCodes(root, "", codes);
 
     //// Print Huffman Codes
     //std::cout << "Huffman Codes:\n";
@@ -221,13 +248,28 @@ int main(int argc, char **argv)
     //    std::cout << pair.first << " " << pair.second << "\n";
     //}
 
-    //// Reinterpret the array with different indices
-    //uint8_t(*p)[3][3][3] = reinterpret_cast<uint8_t(*)[3][3][3]>(array.data());
 
-    //for (int i = 0; i < 3; i++)
-    //    for (int j = 0; j < 3; j++)
-    //        std::rotate(std::begin((*p)[i][j]), std::begin((*p)[i][j]) + 2, std::end((*p)[i][j]));
+    // Reinterpret the array with different indices
+    uint8_t(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] = reinterpret_cast<uint8_t(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(file_buffer.data());
 
+    for (int i = 0; i < RUBIX_SIDE_SIZE; i++)
+        for (int j = 0; j < RUBIX_SIDE_SIZE; j++)
+            std::rotate(std::rbegin((*p)[i][j]), std::rbegin((*p)[i][j]) + key[i], std::rend((*p)[i][j]));
+
+    std::string output_filename = command_line_options["encrypt_file"];
+
+    std::string::size_type dot_location = output_filename.rfind('.');
+    if (dot_location == std::string::npos)
+        dot_location = output_filename.length();
+    else
+        dot_location++;
+
+    output_filename.replace(dot_location, FILE_EXTENSION.length(), FILE_EXTENSION.c_str());
+
+    if (write_file(output_filename, file_buffer) == false)
+    {
+        std::cerr << "Error writing file: " << output_filename << std::endl;
+    }
 
     return 0;
 }

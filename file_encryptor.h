@@ -143,3 +143,11 @@ const char PI[] = "\x0\x1\x4\x1\x5\x9\x2\x6\x5\x3\x5\x8\x9\x7\x9\x3\x2\x3\x8\x4\
 
 	constexpr int MAX_FILE_SIZE = TWELVE_MEGABYTES;
 	constexpr int MAX_ARRAY_SIZE = SIXTEEN_MEGABYTES;
+
+	constexpr uint16_t RUBIX_SIDE_SIZE = 256;
+
+	const std::string FILE_EXTENSION = "khn";
+
+#ifndef  DEBUG
+#define  DEBUG
+#endif //DEBUG
