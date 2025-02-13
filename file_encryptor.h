@@ -6,6 +6,7 @@
 */
 #pragma once
 #include <iostream>
+#include <iomanip>
 #include <string>
 #include <vector>
 #include <array>
@@ -13,6 +14,7 @@
 #include <map>
 #include <queue>
 #include <cstdint>
+#include <algorithm>
 
 const uint32_t primes[] = {
 	2503,   2741,   10007,  12451,  17489,  17789,  28277,  32491,  36109,  39623,  42071,  43427,  55213,  55343,  64381,  64499,
@@ -144,10 +146,37 @@ const char PI[] = "\x0\x1\x4\x1\x5\x9\x2\x6\x5\x3\x5\x8\x9\x7\x9\x3\x2\x3\x8\x4\
 	constexpr int MAX_FILE_SIZE = TWELVE_MEGABYTES;
 	constexpr int MAX_ARRAY_SIZE = SIXTEEN_MEGABYTES;
 
-	constexpr uint16_t RUBIX_SIDE_SIZE = 256;
+	constexpr int SIXTY_FOUR_CUBED = 262'144;
+	constexpr int EIGHT_CUBED = 512;
+	constexpr int FOUR_CUBED = 64;
+
+	constexpr uint16_t RUBIX_SIDE_SIZE = 4;
 
 	const std::string FILE_EXTENSION = "khn";
 
 #ifndef  DEBUG
 #define  DEBUG
-#endif //DEBUG
+#endif					//DEBUG
+
+/*
+	* This flag determines if we 'brute force' a rotation encryption by shifting values in each
+	* dimension, or spend some memory to move indexes around.
+	*
+*/
+#ifndef BRUTE_FORCE
+#define BRUTE_FORCE 1
+#endif					//BRUTE_FORCE
+
+#if BRUTE_FORCE
+	using file_buffer_type = uint8_t;
+#else
+	using file_buffer_type = uint32_t;
+
+	constexpr uint8_t X_OFFSET = 8;
+	constexpr uint8_t Y_OFFSET = 16;
+	constexpr uint8_t Z_OFFSET = 24;
+
+	constexpr uint32_t X_MASK = 0XFFFF00FF;
+	constexpr uint32_t Y_MASK = 0XFF00FFFF;
+	constexpr uint32_t Z_MASK = 0X00FFFFFF;
+#endif

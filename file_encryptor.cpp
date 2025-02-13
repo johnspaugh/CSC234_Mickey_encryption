@@ -69,7 +69,12 @@ bool parse_options(int argc, char** argv, std::map<std::string, std::string>& co
             command_line_options["key_file"] = argv[i + 1];
         else if ((std::strcmp(argv[i], "-f") == 0) && (i + 1 < argc))
             command_line_options["encrypt_file"] = argv[i + 1];
+        else if (std::strcmp(argv[i], "decode") == 0)
+            command_line_options["decode"] = "true";
     }
+
+    if (command_line_options.find("decode") == command_line_options.end())
+        command_line_options["decode"] = "false";
 
     return true;
 }
@@ -90,7 +95,7 @@ bool parse_options(int argc, char** argv, std::map<std::string, std::string>& co
  * @return  boolean                 if we have any issue reading the file return false, 
  *                                      otherwise return true;
 */
-bool read_file(std::string input_file, std::vector<uint8_t>& input_file_buffer)
+bool read_file(std::string input_file, std::vector<file_buffer_type>& input_file_buffer)
 {
     std::ifstream input(input_file, std::ifstream::ate | std::ios::binary);
 
@@ -109,86 +114,159 @@ bool read_file(std::string input_file, std::vector<uint8_t>& input_file_buffer)
     }
 
     input.seekg(0);
-
-    input_file_buffer.resize(file_size);
+#if BRUTE_FORCE
     input.read(reinterpret_cast<char*>(input_file_buffer.data()), static_cast<int>(file_size));
-    
+#else
+    std::vector<uint8_t> temp(file_size);
+    input.read(reinterpret_cast<char*>(temp.data()), static_cast<int>(file_size));
+#endif
     input.close();
 
+#if 0
     // write 3 bytes for the size of the file.
     for (int i = 2; i >= 0; i--)
-        input_file_buffer.insert(input_file_buffer.begin() + (2-i), (file_size >> (i * 8)) & 0xff);
+        temp_buffer.insert(temp_buffer.begin() + (2-i), (file_size >> (i * 8)) & 0xff);
 
-    input_file_buffer.insert(input_file_buffer.begin() + 3, (uint8_t)input_file.size());
+    temp_buffer.insert(temp_buffer.begin() + 3, (uint8_t)input_file.size());
 
     // write the file name to the end of the buffer
-    input_file_buffer.insert(input_file_buffer.begin() + 4, input_file.begin(), input_file.end());
+    temp_buffer.insert(temp_buffer.begin() + 4, input_file.begin(), input_file.end());
 
     //TODO: fill remaining array with random noise
-    input_file_buffer.resize(SIXTEEN_MEGABYTES, '0');
+#endif
 
+#if BRUTE_FORCE
+    input_file_buffer.resize(RUBIX_SIDE_SIZE * RUBIX_SIDE_SIZE * RUBIX_SIDE_SIZE, '0');
+#else
+    std::copy(temp.begin(), temp.end(), std::back_inserter(input_file_buffer));
+    input_file_buffer.erase(input_file_buffer.begin());
+
+    // Reinterpret the array with different indices
+    uint32_t(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
+        reinterpret_cast<uint32_t(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(input_file_buffer.data());
+
+    for (uint8_t z = 0; z < RUBIX_SIDE_SIZE; z++)
+        for (uint8_t y = 0; y < RUBIX_SIDE_SIZE; y++)
+            for (uint8_t x = 0; x < RUBIX_SIDE_SIZE; x++)
+            {
+                (*p)[z][y][x] |= (x << X_OFFSET);
+                (*p)[z][y][x] |= (y << Y_OFFSET);
+                (*p)[z][y][x] |= (z << Z_OFFSET);
+            }
+
+#endif
     return true;
 }
 
+#if BRUTE_FORCE
 /*
- * This function rotates a 'row' in the 'x' direction an amount specified. We uses
+ * This function rotates a 'row' in the 'x' direction an amount specified. We use
  * std::rotate as it has the wrap function specified.
  *
- * TODO: implement using std::rotate
- *
- * @param   amount              name of the file to read in
+ * @param   input               buffer to file to encrypt
+ * @param   key                 key dictating how much to shift each row
  * @return  void
 */
-void shift_x(uint8_t amount)
+void shift_x(std::vector<file_buffer_type>& input, std::vector<uint8_t>& key, bool decode)
 {
+    // Reinterpret the array with different indices
+    file_buffer_type(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] = reinterpret_cast<file_buffer_type(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(input.data());
 
+    uint8_t key_index = 0;
+    for (int x = 0; x < RUBIX_SIDE_SIZE; x++)
+        for (int y = 0; y < RUBIX_SIDE_SIZE; y++)
+            if (decode)
+                std::rotate(std::begin((*p)[x][y]), std::begin((*p)[x][y]) + key[y], std::end((*p)[x][y]));
+            else
+                std::rotate(std::rbegin((*p)[x][y]), std::rbegin((*p)[x][y]) + key[y], std::rend((*p)[x][y]));
 }
 
 /*
- * This function rotates a 'column' in the 'y' direction an amount specified. We uses
- * std::rotate as it has the wrap function specified.
+ * This function rotates a 'column' in the 'y' direction an amount specified. We use
+ * std::rotate as it has the wrap function specified. I don't know if there's a better
+ * method than removing the column, rotating it, then putting it back.
  *
- * TODO: implement using std::rotate. we'll probably have to write the 'column' to a temporary
- * buffer, rotate it, then write it back. I think it'll cost the same as trying to rotate in place.
- *
- * @param   amount              name of the file to read in
+ * @param   input               file buffer to decrypt
+ * @param   key                 key dictating how much to shift each column
  * @return  void
 */
-void shift_y(char amount) 
+void shift_y(std::vector<file_buffer_type>& input, std::vector<uint8_t>& key, bool decode)
 {
+    // Reinterpret the array with different indices
+    file_buffer_type(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] = reinterpret_cast<file_buffer_type(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(input.data());
 
+    for (uint8_t x = 0; x < RUBIX_SIDE_SIZE; x++)
+    {
+        uint8_t key_index = 0;
+        for (uint8_t z = 0; z < RUBIX_SIDE_SIZE; z++)
+        {
+            std::vector<file_buffer_type> temp(RUBIX_SIDE_SIZE);
+            for (uint8_t y = 0; y < RUBIX_SIDE_SIZE; y++)
+                temp[y] = (*p)[x][y][z];
+
+            if (decode)
+                std::rotate(temp.begin(), temp.begin() + key[key_index], temp.end());
+            else
+                std::rotate(temp.rbegin(), temp.rbegin() + key[key_index], temp.rend());
+
+            for (uint8_t y = 0; y < RUBIX_SIDE_SIZE; y++)
+                (*p)[x][y][z] = temp[y];
+            key_index = (key_index + 1) % RUBIX_SIDE_SIZE;
+        }
+    }
 }
 
-
 /*
- * This function rotates a 'drawer' in the 'z' direction an amount specified. We uses
+ * This function rotates a 'drawer' in the 'z' direction an amount specified. We use
  * std::rotate as it has the wrap function specified.
  *
  * @TODO: implement using std::rotate. we'll probably have to write the 'drawer' to a temporary
  * buffer, rotate it, then write it back. I think it'll cost the same as trying to rotate in place.
  *
- * @param   amount              name of the file to read in
+ * @param   input               file buffer to decrypt
+ * @param   key                 key dictating how much to shift each column
  * @return  void
 */
-void shift_z(char amount)
+void shift_z(std::vector<file_buffer_type>& input, std::vector<uint8_t>& key, bool decode)
 {
+    // Reinterpret the array with different indices
+    file_buffer_type(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] = reinterpret_cast<file_buffer_type(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(input.data());
 
+    for (uint8_t z = 0; z < RUBIX_SIDE_SIZE; z++)
+    {
+        uint8_t key_index = 0;
+        for (uint8_t y = 0; y < RUBIX_SIDE_SIZE; y++)
+        {
+            std::vector<file_buffer_type> temp(RUBIX_SIDE_SIZE);
+            for (uint8_t x = 0; x < RUBIX_SIDE_SIZE; x++)
+                temp[x] = (*p)[x][y][z];
+
+            if (decode)
+                std::rotate(temp.begin(), temp.begin() + key[key_index], temp.end());
+            else
+                std::rotate(temp.rbegin(), temp.rbegin() + key[z], temp.rend());
+
+            for (uint8_t x = 0; x < RUBIX_SIDE_SIZE; x++)
+                (*p)[x][y][z] = temp[x];
+            key_index = (key_index + 1) % RUBIX_SIDE_SIZE;
+        }
+    }
 }
+#endif      //BRUTE_FORCE
 
 /*
- * This function main entry point of the program. Used mainly as driver to parse the command line
- * options, get the encyption key, and read in the file to encrypt. Will print to standard error if
- * we encounter a problem with any of the parsing/reading so far.
+ * This function writes the encripted file to disk. Since ofstream::write takes
+ * char *, we can cast it either way BRUTE_FORCE or not since we only care about
+ * the least most byte.
  *
- * TODO: huffman functions taken from web in another file, need to incorporate to this one before doing
- * the rubix shuffle. Also need to figure out how to write the rubix array to the output file.
+ * @TODO: 
  *
- * @param   argc                    number of command line parameters
- * @param   argv                    command line parameters
- * @return  int                     0 if successful, -1 otherwise
+ * @param   output_file               name of file to write
+ * @param   file_buffer               file buffer to write
+ * @return  bool
 */
 
-bool write_file(std::string output_file, std::vector<uint8_t> file_buffer)
+bool write_file(std::string output_file, std::vector<file_buffer_type> file_buffer)
 {
     // Open the file in binary mode
     std::ofstream outfile(output_file, std::ios::binary);
@@ -208,6 +286,47 @@ bool write_file(std::string output_file, std::vector<uint8_t> file_buffer)
     return true;
 }
 
+/*
+ * This function is primarily for debugging so we can track progress through out rotations.
+ * I've set the 'matrix3d' as a reference so we don't copy a huge buffer.
+ *
+ * @TODO:
+ *
+ * @param   remark                  something to write before printing matrix
+ * @param   matrix3d                std::vector to represent as 3d matrix and print
+ * @return  void
+*/
+void print_matrix(std::string remark, std::vector<file_buffer_type>& matrix3d)
+{
+    // Reinterpret the array with different indices
+    uint32_t(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
+        reinterpret_cast<uint32_t(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(matrix3d.data());
+
+    std::cout << remark << std::endl;
+    for (uint8_t i = 0; i < RUBIX_SIDE_SIZE; i++)
+    {
+        for (uint8_t j = 0; j < RUBIX_SIDE_SIZE; j++)
+        {
+            for (uint8_t k = 0; k < RUBIX_SIDE_SIZE; k++)
+                std::cout << std::hex << std::setw(8) << std::setfill('0') << file_buffer_type((*p)[i][j][k]) << " ";
+            std::cout << std::endl;
+        }
+        std::cout << std::endl;
+    }
+}
+
+/*
+ * This function main entry point of the program. Used mainly as driver to parse the command line
+ * options, get the encyption key, and read in the file to encrypt. Will print to standard error if
+ * we encounter a problem with any of the parsing/reading so far.
+ *
+ * TODO: huffman functions taken from web in another file, need to incorporate to this one before doing
+ * the rubix shuffle. Also need to figure out how to write the rubix array to the output file.
+ *
+ * @param   argc                    number of command line parameters
+ * @param   argv                    command line parameters
+ * @return  int                     0 if successful, -1 otherwise
+*/
 int main(int argc, char **argv)
 {
     std::map<std::string, std::string> command_line_options;
@@ -219,13 +338,22 @@ int main(int argc, char **argv)
     }
 
     std::vector<uint8_t> key;
+
+#ifndef DEBUG
     if (get_key(command_line_options["key_file"], key) == false)
     {
         std::cerr << "Error with key." << std::endl;
         exit(-1);
     }
+#else
+    key.push_back(1);
+    key.push_back(2);
+    key.push_back(3);
+    key.push_back(0);
+    key.resize(1000, 0);
+#endif
 
-    std::vector<uint8_t> file_buffer;
+    std::vector<file_buffer_type> file_buffer = { 0 };
     if (read_file(command_line_options["encrypt_file"], file_buffer) == false)
     {
         std::cerr << "Error with input file." << std::endl;
@@ -248,13 +376,50 @@ int main(int argc, char **argv)
     //    std::cout << pair.first << " " << pair.second << "\n";
     //}
 
+    print_matrix("start:", file_buffer);
+#if BRUTE_FORCE
+    shift_x(file_buffer, key, (command_line_options["decode"] == "true"));
 
+    //print_matrix("after x:", file_buffer);
+
+    shift_y(file_buffer, key, command_line_options["decode"] == "true");
+
+    //print_matrix("after y:", file_buffer);
+
+    shift_z(file_buffer, key, command_line_options["decode"] == "true");
+
+    print_matrix("Final:", file_buffer);
+#else
     // Reinterpret the array with different indices
-    uint8_t(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] = reinterpret_cast<uint8_t(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(file_buffer.data());
+    file_buffer_type(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
+        reinterpret_cast<file_buffer_type(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(file_buffer.data());
 
-    for (int i = 0; i < RUBIX_SIDE_SIZE; i++)
-        for (int j = 0; j < RUBIX_SIDE_SIZE; j++)
-            std::rotate(std::rbegin((*p)[i][j]), std::rbegin((*p)[i][j]) + key[i], std::rend((*p)[i][j]));
+    for (uint8_t z = 0; z < RUBIX_SIDE_SIZE; z++)
+        for (uint8_t y = 0; y < RUBIX_SIDE_SIZE; y++)
+            for (uint8_t x = 0; x < RUBIX_SIDE_SIZE; x++)
+            {
+                uint32_t current_x_location = (*p)[z][y][x] >> X_OFFSET;
+                (*p)[z][y][x] &= X_MASK;
+                current_x_location = ((current_x_location + key[y]) % RUBIX_SIDE_SIZE);
+                (*p)[z][y][x] |= (current_x_location << X_OFFSET);
+
+                uint8_t x_loc = ((x - key[y]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
+
+                uint32_t current_y_location = ((*p)[z][y % RUBIX_SIDE_SIZE][x_loc] & ~Y_MASK) >> Y_OFFSET;
+                (*p)[z][y % RUBIX_SIDE_SIZE][x_loc] &= (Y_MASK);
+                current_y_location = ((current_y_location + key[x]) % RUBIX_SIDE_SIZE);
+                (*p)[z][y % RUBIX_SIDE_SIZE][x_loc] |= (current_y_location << Y_OFFSET);
+
+                uint32_t current_z_location = ((*p)[z][y][x_loc] & ~Z_MASK) >> Z_OFFSET;
+                (*p)[z][y][x_loc] &= (Z_MASK);
+                current_z_location = (((current_z_location + key[x]) % RUBIX_SIDE_SIZE));
+                (*p)[z][y][x_loc] |= (current_z_location << Z_OFFSET);
+            }
+
+    std::sort(file_buffer.begin(), file_buffer.end());
+
+    print_matrix("final:", file_buffer);
+#endif
 
     std::string output_filename = command_line_options["encrypt_file"];
 

@@ -1,1 +1,7 @@
-build/
+*.bin
+*.khn
+*.txt
+/.vs/file_encryptor/
+/file_encryptor/*
+/x64
+/.vs
