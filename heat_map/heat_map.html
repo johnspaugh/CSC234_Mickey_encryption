@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<head>
+	<title>Heat Map Generator</title>
+</head>
+<body>
+	<label for="fname">File name:</label>
+	<input type="file" id="file-input" name="file-input"><br><br>
+	<div id ="standard-deviation"></div>
+	<div id ="mean"></div>
+	<div id="message"></div>
+</body>
+<script>
+	const standardDeviation = (arr, usePopulation = false) => {
+		const mean = arr.reduce((acc, val) => acc + val, 0) / arr.length;
+		const sumOfSquaredDifferences = arr.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0);
+		const standard_deviation = Math.sqrt(sumOfSquaredDifferences / (arr.length - (usePopulation ? 0 : 1)));
+
+		return {standard_deviation, mean};
+	};
+
+	const get_table_data = () => {
+		const table = document.getElementById('table');
+		const table_data = new Array();
+		for (let i = 0; i < 16; i++)
+			for (let j = 0; j < 16; j++)
+			{
+				table_data.push(parseInt(table.rows[i+1].cells[j+1].textContent));
+			}
+		return table_data;
+	}
+
+	const get_standard_deviation = () => {
+		const table_data = get_table_data();
+		const statistics = standardDeviation(table_data);
+		
+		document.getElementById('standard-deviation').textContent = "Standard Deviation: " + statistics.standard_deviation;
+		document.getElementById('mean').textContent = "Mean: " + statistics.mean;
+
+		return table_data.map(d => (d - statistics.mean) / statistics.standard_deviation);
+	}
+
+	const color_table = (stdArray) => {
+		const table = document.getElementById('table');
+		for (let row = 0; row < 16; row++)
+			for (let col = 0; col < 16; col++)
+			{
+				if (Math.abs(stdArray[(row)*16 + (col)]) < 1)
+					table.rows[row+1].cells[col+1].style.backgroundColor = 'green';
+				else if (Math.abs(stdArray[(row)*16 + (col)]) < 2)
+					table.rows[row+1].cells[col+1].style.backgroundColor = 'yellow';
+				else 
+					table.rows[row+1].cells[col+1].style.backgroundColor = 'red';
+			}
+	}
+
+	const reset_display = () =>	{
+		const table = document.getElementById('table');
+
+		const std_display = document.getElementById('standard-deviation');
+		const mean_display = document.getElementById('mean');
+		const message_display = document.getElementById('message');
+
+		std_display.textContent = "";
+		mean_display.textContent = "";
+		message_display.textContent = "";
+
+		for (let i = 0; i < 16; i++)
+			for (let j = 0; j < 16; j++)
+			{
+				table.rows[i+1].cells[j+1].textContent = "0";
+			}
+	}
+
+	const fileInput = document.getElementById("file-input");
+	fileInput.addEventListener("change", (event) =>	{
+		const file = event.target.files[0];
+		if (!file)
+		{
+			console.log("file error");
+			return;
+		}
+
+		reset_display();
+
+		var byte_array = new Array(256).fill(0);
+
+		// Read the file
+		const reader = new FileReader();
+
+		reader.onload = (event) => {
+			const arrayBuffer = event.target.result;
+			
+			const uint8Array = new Uint8Array(arrayBuffer);
+			
+			uint8Array.forEach((element) => {
+				byte_array[element]++;
+			});			
+		};
+
+		reader.onloadend = (event) => {
+			const table = document.getElementById('table');
+			byte_array.forEach((element, index) => {
+				const rowIndex = Math.floor(index/16)+1;
+				const colIndex = index%16+1;
+				
+				const cell = table.rows[rowIndex].cells[colIndex];
+				
+				cell.textContent = element;
+			}, table);
+			const stdArray = get_standard_deviation();
+			color_table(stdArray);
+		}
+		
+		reader.onerror = (event) => {
+			console.error("Error reading file:", event);
+		};
+		
+		reader.readAsArrayBuffer(file)
+	});
+
+	function formatHex(number) 
+	{
+		const hex = number.toString(16);
+		return hex.length === 1 ? "0" + hex : hex;
+	}
+		
+	function tableCreate() 
+	{
+	const body = document.body
+			, tbl = document.createElement('table')
+			, header = 	tbl.createTHead();
+	tbl.style.border = '1px solid black';
+	tbl.setAttribute('id', 'table');
+
+	var row = header.insertRow(0);
+	var cell = row.insertCell(0);
+	for (let i = 0; i < 16; i++)
+	{
+		var cell = row.insertCell(i+1);
+		cell.innerHTML = "<b>0x" + formatHex(i) + "</b>";
+	}
+
+	for (let i = 0; i < 16; i++) 
+	{
+		const tr = tbl.insertRow();
+		for (let j = 0; j <= 16; j++) 
+		{
+			const td = tr.insertCell();
+			td.style.border = '1px solid black';
+			if (j == 0)
+				td.innerHTML = "<b>0x"+formatHex(i*16) + "</b>";
+			else
+				td.appendChild(document.createTextNode('0'));
+		}
+	}
+	body.appendChild(tbl);
+	}
+
+	tableCreate();
+</script>
