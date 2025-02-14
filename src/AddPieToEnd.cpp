@@ -1,17 +1,15 @@
 
-#include <stdlib> //<stdlib.h>
+#include <stdlib> //<stdlib.h> if wanted to hold in the include file.
 #include <iostream>
 #include <fstream>
 #include <string>
 
 namespace fs = std::filesystem;
 
-
-
 string AddPieToEnd(string password){
 
     string passwordPadding = NULL;
-    string pieString = readFile("/storage/PieNumbers.txt");
+    string pieString = readFile("/storage/LittlePieNumbers1K.txt");
 
     passwordPadding = password + pieString;
     string result = truncateString(passwordPadding);
@@ -54,8 +52,7 @@ string retrievePassword(string password, int passwordNumber){
     }
 
     ModifiedPassword = readFile(path);
-    pieString = readFile("/storage/PieNumbers.txt");
-
+    ModifiedPassword = AddPieToEnd(ModifiedPassword);
     
     return ModifiedPassword;
 }
