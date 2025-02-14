@@ -115,6 +115,7 @@ bool read_file(std::string input_file, std::vector<file_buffer_type>& input_file
 
     input.seekg(0);
 #if BRUTE_FORCE
+    input_file_buffer.resize(file_size);
     input.read(reinterpret_cast<char*>(input_file_buffer.data()), static_cast<int>(file_size));
 #else
     std::vector<uint8_t> temp(file_size);
@@ -299,8 +300,8 @@ bool write_file(std::string output_file, std::vector<file_buffer_type> file_buff
 void print_matrix(std::string remark, std::vector<file_buffer_type>& matrix3d)
 {
     // Reinterpret the array with different indices
-    uint32_t(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
-        reinterpret_cast<uint32_t(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(matrix3d.data());
+    file_buffer_type(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
+        reinterpret_cast<file_buffer_type(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(matrix3d.data());
 
     std::cout << remark << std::endl;
     for (uint8_t i = 0; i < RUBIX_SIDE_SIZE; i++)
@@ -308,7 +309,12 @@ void print_matrix(std::string remark, std::vector<file_buffer_type>& matrix3d)
         for (uint8_t j = 0; j < RUBIX_SIDE_SIZE; j++)
         {
             for (uint8_t k = 0; k < RUBIX_SIDE_SIZE; k++)
-                std::cout << std::hex << std::setw(8) << std::setfill('0') << file_buffer_type((*p)[i][j][k]) << " ";
+                std::cout << std::hex << std::setw(8) << std::setfill('0') 
+#if BRUTE_FORCE
+                << int((*p)[i][j][k]) << " ";
+#else
+                << file_buffer_type((*p)[i][j][k]) << " ";
+#endif
             std::cout << std::endl;
         }
         std::cout << std::endl;
