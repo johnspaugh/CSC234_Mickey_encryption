@@ -1,1 +1,7 @@
 build/
+
+modules/
+
+.vscode/
+
+.vs/
