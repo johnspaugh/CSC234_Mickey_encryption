@@ -5,16 +5,17 @@
  * 
 */
 #pragma once
-#include <iostream>
-#include <iomanip>
-#include <string>
-#include <vector>
 #include <array>
+#include <algorithm>
+#include <bit>
+#include <cstdint>
 #include <fstream>
+#include <iomanip>
+#include <iostream>
 #include <map>
 #include <queue>
-#include <cstdint>
-#include <algorithm>
+#include <string>
+#include <vector>
 
 const uint32_t primes[] = {
 	2503,   2741,   10007,  12451,  17489,  17789,  28277,  32491,  36109,  39623,  42071,  43427,  55213,  55343,  64381,  64499,
@@ -157,6 +158,10 @@ const char PI[] = "\x0\x1\x4\x1\x5\x9\x2\x6\x5\x3\x5\x8\x9\x7\x9\x3\x2\x3\x8\x4\
 #ifndef  DEBUG
 #define  DEBUG
 #endif					//DEBUG
+
+#ifndef DEBUG_OUTPUT
+#define DEBUG_OUTPUT 0
+#endif
 
 /*
 	* This flag determines if we 'brute force' a rotation encryption by shifting values in each

@@ -65,16 +65,34 @@ bool parse_options(int argc, char** argv, std::map<std::string, std::string>& co
 {
     for (int i = 1; i < argc; i++)
     {
-        if ((std::strcmp(argv[i], "-k") == 0) && (i + 1 < argc))
-            command_line_options["key_file"] = argv[i + 1];
-        else if ((std::strcmp(argv[i], "-f") == 0) && (i + 1 < argc))
-            command_line_options["encrypt_file"] = argv[i + 1];
+        if (std::strcmp(argv[i], "-k") == 0)
+        {
+            if (i + 1 >= argc)
+            {
+                return false;
+            }
+            else
+            {
+                command_line_options["key_file"] = argv[i + 1];
+            }
+        }
+        else if (std::strcmp(argv[i], "-f") == 0)
+        {
+            if (i + 1 >= argc)
+            {
+                return false;
+            }
+            else
+            {
+                command_line_options["encrypt_file"] = argv[i + 1];
+            }
+        }
         else if (std::strcmp(argv[i], "decode") == 0)
-            command_line_options["decode"] = "true";
+            command_line_options["direction"] = "decode";
     }
 
     if (command_line_options.find("decode") == command_line_options.end())
-        command_line_options["decode"] = "false";
+        command_line_options["decode"] = "encode";
 
     return true;
 }
@@ -253,6 +271,62 @@ void shift_z(std::vector<file_buffer_type>& input, std::vector<uint8_t>& key, bo
         }
     }
 }
+#else
+void encode(std::vector<file_buffer_type>& file_buffer, std::vector<uint8_t>& key)
+{
+    // Reinterpret the array with different indices
+    file_buffer_type(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
+        reinterpret_cast<file_buffer_type(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(file_buffer.data());
+
+    for (uint8_t z = 0; z < RUBIX_SIDE_SIZE; z++)
+        for (uint8_t y = 0; y < RUBIX_SIDE_SIZE; y++)
+            for (uint8_t x = 0; x < RUBIX_SIDE_SIZE; x++)
+            {
+                uint32_t current_x_location = (*p)[z][y][x] >> X_OFFSET;
+                (*p)[z][y][x] &= X_MASK;
+                current_x_location = ((current_x_location + key[y]) % RUBIX_SIDE_SIZE);
+                (*p)[z][y][x] |= (current_x_location << X_OFFSET);
+
+                uint8_t x_loc = ((x - key[y]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
+
+                uint32_t current_y_location = ((*p)[z][y % RUBIX_SIDE_SIZE][x_loc] & ~Y_MASK) >> Y_OFFSET;
+                (*p)[z][y % RUBIX_SIDE_SIZE][x_loc] &= (Y_MASK);
+                current_y_location = ((current_y_location + key[x]) % RUBIX_SIDE_SIZE);
+                (*p)[z][y % RUBIX_SIDE_SIZE][x_loc] |= (current_y_location << Y_OFFSET);
+
+                uint32_t current_z_location = ((*p)[z][y][x_loc] & ~Z_MASK) >> Z_OFFSET;
+                (*p)[z][y][x_loc] &= (Z_MASK);
+                current_z_location = (((current_z_location + key[x]) % RUBIX_SIDE_SIZE));
+                (*p)[z][y][x_loc] |= (current_z_location << Z_OFFSET);
+            }
+}
+
+void decode(std::vector<file_buffer_type>& file_buffer, std::vector<uint8_t>& key)
+{
+    // Reinterpret the array with different indices
+    file_buffer_type(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
+        reinterpret_cast<file_buffer_type(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(file_buffer.data());
+
+    for (uint8_t z = 0; z < RUBIX_SIDE_SIZE; z++)
+        for (uint8_t y = 0; y < RUBIX_SIDE_SIZE; y++)
+            for (uint8_t x = 0; x < RUBIX_SIDE_SIZE; x++)
+            {
+                uint32_t current_z_location = ((*p)[z][y][x] & ~Z_MASK) >> Z_OFFSET;
+                (*p)[z][y][x] &= (Z_MASK);
+                current_z_location = ((current_z_location - key[x]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
+                (*p)[z][y][x] |= (current_z_location << Z_OFFSET);
+
+                uint32_t current_y_location = ((*p)[z][y][x] & ~Y_MASK) >> Y_OFFSET;
+                (*p)[z][y][x] &= (Y_MASK);
+                current_y_location = ((current_y_location - key[x]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
+                (*p)[z][y][x] |= (current_y_location << Y_OFFSET);
+
+                uint32_t current_x_location = ((*p)[z][y][x] & ~X_MASK) >> X_OFFSET;
+                (*p)[z][y][x] &= X_MASK;
+                current_x_location = ((current_x_location - key[y]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
+                (*p)[z][y][x] |= (current_x_location << X_OFFSET);
+            }
+}
 #endif      //BRUTE_FORCE
 
 /*
@@ -260,7 +334,7 @@ void shift_z(std::vector<file_buffer_type>& input, std::vector<uint8_t>& key, bo
  * char *, we can cast it either way BRUTE_FORCE or not since we only care about
  * the least most byte.
  *
- * @TODO: 
+ * @TODO:
  *
  * @param   output_file               name of file to write
  * @param   file_buffer               file buffer to write
@@ -279,7 +353,9 @@ bool write_file(std::string output_file, std::vector<file_buffer_type> file_buff
     }
 
     // Write the data to the file
-    outfile.write(reinterpret_cast<char*>(file_buffer.data()), file_buffer.size());
+    // We're only interested in the least significant byte to put in to the file
+    for (auto byte : file_buffer)
+        outfile.put(byte & 0xff);
 
     // Close the file
     outfile.close();
@@ -309,7 +385,7 @@ void print_matrix(std::string remark, std::vector<file_buffer_type>& matrix3d)
         for (uint8_t j = 0; j < RUBIX_SIDE_SIZE; j++)
         {
             for (uint8_t k = 0; k < RUBIX_SIDE_SIZE; k++)
-                std::cout << std::hex << std::setw(8) << std::setfill('0') 
+                std::cout << std::hex << std::setw(8) << std::setfill('0')
 #if BRUTE_FORCE
                 << int((*p)[i][j][k]) << " ";
 #else
@@ -384,49 +460,30 @@ int main(int argc, char **argv)
 
     print_matrix("start:", file_buffer);
 #if BRUTE_FORCE
-    shift_x(file_buffer, key, (command_line_options["decode"] == "true"));
+    shift_x(file_buffer, key, (command_line_options["direction"] == "decode"));
 
     //print_matrix("after x:", file_buffer);
 
-    shift_y(file_buffer, key, command_line_options["decode"] == "true");
+    shift_y(file_buffer, key, command_line_options["direction"] == "decode");
 
     //print_matrix("after y:", file_buffer);
 
-    shift_z(file_buffer, key, command_line_options["decode"] == "true");
+    shift_z(file_buffer, key, command_line_options["direction"] == "decode");
 
     print_matrix("Final:", file_buffer);
 #else
-    // Reinterpret the array with different indices
-    file_buffer_type(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
-        reinterpret_cast<file_buffer_type(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(file_buffer.data());
 
-    for (uint8_t z = 0; z < RUBIX_SIDE_SIZE; z++)
-        for (uint8_t y = 0; y < RUBIX_SIDE_SIZE; y++)
-            for (uint8_t x = 0; x < RUBIX_SIDE_SIZE; x++)
-            {
-                uint32_t current_x_location = (*p)[z][y][x] >> X_OFFSET;
-                (*p)[z][y][x] &= X_MASK;
-                current_x_location = ((current_x_location + key[y]) % RUBIX_SIDE_SIZE);
-                (*p)[z][y][x] |= (current_x_location << X_OFFSET);
-
-                uint8_t x_loc = ((x - key[y]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
-
-                uint32_t current_y_location = ((*p)[z][y % RUBIX_SIDE_SIZE][x_loc] & ~Y_MASK) >> Y_OFFSET;
-                (*p)[z][y % RUBIX_SIDE_SIZE][x_loc] &= (Y_MASK);
-                current_y_location = ((current_y_location + key[x]) % RUBIX_SIDE_SIZE);
-                (*p)[z][y % RUBIX_SIDE_SIZE][x_loc] |= (current_y_location << Y_OFFSET);
-
-                uint32_t current_z_location = ((*p)[z][y][x_loc] & ~Z_MASK) >> Z_OFFSET;
-                (*p)[z][y][x_loc] &= (Z_MASK);
-                current_z_location = (((current_z_location + key[x]) % RUBIX_SIDE_SIZE));
-                (*p)[z][y][x_loc] |= (current_z_location << Z_OFFSET);
-            }
+    if (command_line_options["direction"] == "encode")
+        encode(file_buffer, key);
+    else
+        decode(file_buffer, key);
 
     std::sort(file_buffer.begin(), file_buffer.end());
 
     print_matrix("final:", file_buffer);
 #endif
 
+#ifndef DEBUG_OUTPUT
     std::string output_filename = command_line_options["encrypt_file"];
 
     std::string::size_type dot_location = output_filename.rfind('.');
@@ -436,6 +493,9 @@ int main(int argc, char **argv)
         dot_location++;
 
     output_filename.replace(dot_location, FILE_EXTENSION.length(), FILE_EXTENSION.c_str());
+#else
+    std::string output_filename = "test.bin";
+#endif
 
     if (write_file(output_filename, file_buffer) == false)
     {
