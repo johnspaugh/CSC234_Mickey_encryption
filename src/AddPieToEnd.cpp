@@ -1,9 +1,10 @@
 
-#include <stdlib> //<stdlib.h> if wanted to hold in the include file.
+//<stdlib.h> if wanted to hold in the include file, alternative to <string>
 #include <iostream>
 #include <fstream>
 #include <string>
 
+using namespace std;
 namespace fs = std::filesystem;
 
 string AddPieToEnd(string password){
@@ -40,15 +41,15 @@ string retrievePassword(string password, int passwordNumber){
     if(passwordNumber == 1){
         // string of password
         path = "/storage/password1.txt";
-    }else(passwordNumber == 2){
+    }else if(passwordNumber == 2){
         //this was picture
         path = "/storage/password2";
-    }else(passwordNumber == 3){
+    }else if(passwordNumber == 3){
         // string of password
         path = "/storage/password3.txt";
     }else{
         printf("did not input the correct password path, so will exit system");
-        return NULL;
+        return ""; //NULL;
     }
 
     ModifiedPassword = readFile(path);
@@ -59,7 +60,7 @@ string retrievePassword(string password, int passwordNumber){
 
 string readFile(string path){
 
-    string output;
+    std::string output;
     //std::string filePath = "../another_folder/my_text_file.txt"; // Relative path
     std::string filePath = path; // "/storage/password1.txt";
     std::ifstream inputFile(filePath);
@@ -69,8 +70,8 @@ string readFile(string path){
         std::getline(inputFile, fileContent);
         inputFile.close();
         std::cout << "Content: " << fileContent << std::endl;
-        output = fileContent;
-        printf(output);
+        output = fileContent; 
+        // std::cout << output << std::endl;
     } else {
         std::cerr << "Unable to open file" << std::endl;
     }

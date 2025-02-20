@@ -1,11 +1,14 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <AddPieToEnd.h>;
 
+using namespace std;
 
 int main() {
     string password = "ttt";
-    AddPieToEnd( password);
+    int passwordNumber = 1;
+    retrievePassword( password, passwordNumber);
     // std::string filePath = "../another_folder/my_text_file.txt"; // Relative path
     // std::ifstream inputFile(filePath);
 
