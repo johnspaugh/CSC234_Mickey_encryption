@@ -1,0 +1,219 @@
+/* author @ tulikachoudhary */
+
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <bitset>
+#include <algorithm>
+#include <random>
+#include <cmath>
+#include <cstring>
+#include <unordered_map>
+#include <queue>
+#include <array>
+#include <sstream>
+
+#define RUBIX_SIZE 256
+#define KEY_SIZE 1024
+
+using namespace std;
+
+// Function to load Pi binary digits from file
+string loadPiDigits(const string &filename) {
+    ifstream file(filename);
+    string pi_digits;
+    if (file) {
+        getline(file, pi_digits);
+        file.close();
+    } else {
+        cerr << "❌ Error: Unable to load Pi digits from file!" << endl;
+        exit(1);
+    }
+    return pi_digits;
+}
+
+// Load PI binary digits from external file
+const string PI_DIGITS = loadPiDigits("pi_10000_binary.txt");
+
+// 3D Rubix Array
+unsigned char rubix[RUBIX_SIZE][RUBIX_SIZE][RUBIX_SIZE];
+
+// Function to load data into Rubix Array
+void loadRubixArray(vector<unsigned char> &data) {
+    size_t index = 0;
+    for (int x = 0; x < RUBIX_SIZE; x++) {
+        for (int y = 0; y < RUBIX_SIZE; y++) {
+            for (int z = 0; z < RUBIX_SIZE; z++) {
+                rubix[x][y][z] = (index < data.size()) ? data[index++] : 0;
+            }
+        }
+    }
+}
+
+// Function to extract data from Rubix Array
+vector<unsigned char> extractRubixArray(size_t originalSize) {
+    vector<unsigned char> extractedData;
+    for (int x = 0; x < RUBIX_SIZE; x++) {
+        for (int y = 0; y < RUBIX_SIZE; y++) {
+            for (int z = 0; z < RUBIX_SIZE; z++) {
+                extractedData.push_back(rubix[x][y][z]);
+                if (extractedData.size() >= originalSize) return extractedData; // Stop extraction
+            }
+        }
+    }
+    return extractedData;
+}
+
+
+
+// Function to shift Rubix Array using key
+void shiftRubixArray(const string &key, bool reverse = false) {
+    size_t limit = min((size_t)KEY_SIZE, (size_t)RUBIX_SIZE);
+    
+    for (size_t i = 0; i < limit; i++) {
+        int shift = key[i] % RUBIX_SIZE;
+        if (reverse) shift = RUBIX_SIZE - shift;  // Reverse shift for decryption
+
+        cout << "🔄 Shifting Rubix Array at key[" << i << "] with shift: " << shift << endl;
+
+        // Row shifting
+        vector<unsigned char> tempRow(RUBIX_SIZE);
+        for (int j = 0; j < RUBIX_SIZE; j++) {
+            tempRow[j] = rubix[i][j][0];
+        }
+        rotate(tempRow.begin(), tempRow.begin() + shift, tempRow.end());
+        for (int j = 0; j < RUBIX_SIZE; j++) {
+            rubix[i][j][0] = tempRow[j];
+        }
+
+        // Column shifting
+        vector<unsigned char> tempCol(RUBIX_SIZE);
+        for (int j = 0; j < RUBIX_SIZE; j++) {
+            tempCol[j] = rubix[j][i][0];
+        }
+        rotate(tempCol.begin(), tempCol.begin() + shift, tempCol.end());
+        for (int j = 0; j < RUBIX_SIZE; j++) {
+            rubix[j][i][0] = tempCol[j];
+        }
+    }
+    cout << "✅ Rubix Shifting Completed!\n";
+}
+
+// Process Key: Ensure 1KB length, pad with Pi digits
+void processKey(string &key) {
+    if (key.size() > KEY_SIZE) {
+        key = key.substr(0, KEY_SIZE);
+    } else {
+        while (key.size() < KEY_SIZE) {
+            key += PI_DIGITS[key.size() % PI_DIGITS.size()];  // Deterministic padding
+        }
+    }
+}
+
+
+// XOR Operation
+void xorOperation(vector<unsigned char> &data, const string &key) {
+    for (size_t i = 0; i < data.size(); i++) {
+        data[i] ^= key[i % KEY_SIZE];  // Must be reversible
+    }
+}
+
+
+// Load and Save Files
+vector<unsigned char> loadFile(const string &filename) {
+    ifstream file(filename, ios::binary);
+    return vector<unsigned char>((istreambuf_iterator<char>(file)), {});
+}
+
+void saveFile(const string &filename, const vector<unsigned char> &data) {
+    ofstream file(filename, ios::binary);
+    file.write(reinterpret_cast<const char*>(data.data()), data.size());
+}
+
+// Encrypt File
+void encryptFile(const string &inputFile, const string &outputFile, string key) {
+    cout << "🔍 Loading file: " << inputFile << endl;
+    vector<unsigned char> data = loadFile(inputFile);
+    size_t originalSize = data.size(); // Store original file size
+
+    cout << "🔑 Processing key..." << endl;
+    processKey(key);
+
+    cout << "🔄 Applying XOR operation..." << endl;
+    xorOperation(data, key);
+
+    cout << "📦 Loading into Rubix Array..." << endl;
+    loadRubixArray(data);
+
+    cout << "🔁 Performing Rubix shifting..." << endl;
+    shiftRubixArray(key);
+
+    cout << "📤 Extracting transformed data..." << endl;
+    vector<unsigned char> transformedData = extractRubixArray(originalSize);
+
+    cout << "💾 Saving encrypted file: " << outputFile << endl;
+    
+    // Store the file size in a metadata file for proper decryption
+    ofstream metaFile(outputFile + ".meta", ios::binary);
+    metaFile.write(reinterpret_cast<const char*>(&originalSize), sizeof(originalSize));
+    metaFile.close();
+
+    saveFile(outputFile, transformedData);
+    cout << "✅ Encryption completed successfully!\n";
+}
+
+
+// Decrypt File
+void decryptFile(const string &inputFile, const string &outputFile, string key) {
+    cout << "🔍 Loading encrypted file: " << inputFile << endl;
+    vector<unsigned char> data = loadFile(inputFile);
+
+    // Retrieve the original file size from metadata file
+    size_t originalSize;
+    ifstream metaFile(inputFile + ".meta", ios::binary);
+    if (metaFile) {
+        metaFile.read(reinterpret_cast<char*>(&originalSize), sizeof(originalSize));
+        metaFile.close();
+    } else {
+        cerr << "❌ Error: Metadata file missing. Decryption may be incorrect!" << endl;
+        return;
+    }
+
+    cout << "🔑 Processing key..." << endl;
+    processKey(key);
+
+    cout << "📦 Loading into Rubix Array..." << endl;
+    loadRubixArray(data);
+
+    cout << "🔄 Reversing Rubix shifting..." << endl;
+    shiftRubixArray(key); // Reverse shifting
+
+    cout << "📤 Extracting original data..." << endl;
+    vector<unsigned char> transformedData = extractRubixArray(originalSize); // Extract only originalSize
+
+    cout << "🔄 Applying XOR operation..." << endl;
+    xorOperation(transformedData, key);
+
+    cout << "💾 Saving decrypted file: " << outputFile << endl;
+    saveFile(outputFile, transformedData);
+
+    cout << "✅ Decryption completed successfully!\n";
+}
+
+
+
+// Main Execution
+int main() {
+    string inputFile = "test.txt";
+    string encryptedFile = "test.khn";
+    string decryptedFile = "test_dec.txt";
+    string key = "SuperSecretKey123456";
+
+    cout << "🔐 Encrypting file...\n";
+    encryptFile(inputFile, encryptedFile, key);
+    
+    cout << "🔓 Decrypting file...\n";
+    decryptFile(encryptedFile, decryptedFile, key);
+
+    return 0;
+}
