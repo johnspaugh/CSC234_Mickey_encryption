@@ -2,6 +2,7 @@
 build/
 modules/
 .vscode/
+/main.exe 
 
 *.bin
 *.khn

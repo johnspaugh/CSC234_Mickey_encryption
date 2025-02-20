@@ -1,8 +1,14 @@
 
-//<stdlib.h> if wanted to hold in the include file, alternative to <string>
+
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <filesystem> 
+#include "../include/AddPieToEnd.h" 
+// #include "filename" is used for local header files, which are made by you.
+// #include <filename> is used for header files Globally included in C++, System header files
+// there is no syntax like <"filename">
+// $ g++ "./src/main.cpp" "./src/AddPieToEnd.cpp" -o main.exe
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -18,12 +24,15 @@ string AddPieToEnd(string password){
     return result;
 }
 
-std::string truncateString(const std::string& inputString) {
+// std::string truncateString(const std::string& inputString) {
+string truncateString(string inputString){
+   
     //1KB = (1024 bytes)
     const size_t maxSize = 1024; 
     if (inputString.length() <= maxSize) {
         //in theory should never have <= input, so message error
-        printf("the input is <= 1KB, should not happen when padding with pie.");
+        // cout 
+        cerr << "the input is <= 1KB, should not happen when padding with pie." << endl;
         return inputString;
     } else {
         return inputString.substr(0, maxSize);
@@ -31,13 +40,15 @@ std::string truncateString(const std::string& inputString) {
 }
 
 string retrievePassword(string password, int passwordNumber){
-
-    string ModifiedPassword = NULL;
-    string pieString = NULL;
+    
+    cout << "Testing 2 " << endl;    
+    string ModifiedPassword = "";
+    string pieString = "";
     //below example
     // string filename = "../../input.txt";
     string filenamePassword1 = "password1.txt";
-    string path = NULL;
+    string path = "";
+    cout << "Testing 3 " << endl;
     if(passwordNumber == 1){
         // string of password
         path = "/storage/password1.txt";
@@ -48,7 +59,9 @@ string retrievePassword(string password, int passwordNumber){
         // string of password
         path = "/storage/password3.txt";
     }else{
-        printf("did not input the correct password path, so will exit system");
+        path = "empty";
+        // cout 
+        cerr << "did not input the correct password path, so will exit system" << endl;
         return ""; //NULL;
     }
 
@@ -66,6 +79,7 @@ string readFile(string path){
     std::ifstream inputFile(filePath);
 
     if (inputFile.is_open()) {
+        cout << "Testing 4 " << endl;
         std::string fileContent;
         std::getline(inputFile, fileContent);
         inputFile.close();

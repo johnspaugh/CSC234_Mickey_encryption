@@ -1,36 +1,32 @@
-/**
- * CPE/CSC 159 - Operating System Pragmatics
- * California State University, Sacramento
- *
- * Kernel Functions and Helpers
- */
 #ifndef ADDPIETOEND_H
 #define ADDPIETOEND_H
 
-#ifndef OS_NAME
-#define OS_NAME "MyOS"
-#endif
+// #include <string>
+// File AddPieToEnd.h
+
 /**
  * append the number Pie to password selected in the input
  */
-string AddPieToEnd(string password);//
+std::string AddPieToEnd(std::string password);//
 
 /**
  * truncate number Pie to password selected in the input
  */
-string truncateString(const std::string& inputString)
+std::string truncateString(std::string inputString);
+// std::string truncatestd::string(const std::std::string& inputstd::string);
+// 
 
 /**
  * append the number Pie to password selected for comparison
  */
-string retrievePassword(string password, int passwordNumber);//
-
+std::string retrievePassword(std::string password, int passwordNumber);//
 
 
 /**
  * read content from file
  */
-string readFile(string path);//
+std::string readFile(std::string path);//
 
 
-#endif
+
+#endif // ADDPIETOEND_H
