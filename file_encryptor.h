@@ -5,8 +5,8 @@
  * 
 */
 #pragma once
-#include <array>
 #include <algorithm>
+#include <any>
 #include <bit>
 #include <cstdint>
 #include <fstream>
@@ -137,23 +137,27 @@ const char PI[] = "\x0\x1\x4\x1\x5\x9\x2\x6\x5\x3\x5\x8\x9\x7\x9\x3\x2\x3\x8\x4\
 	"\x5\x0\x2\x0\x1\x4\x1\x0\x2\x0\x6\x7\x2\x3\x5\x8\x5\x0\x2\x0\x0\x7\x2\x4\x5\x2\x2\x5\x6\x3\x2\x6\x5\x1\x3\x4\x1\x0\x5\x5\x9\x2\x4\x0\x1\x9\x0\x2\x7\x4\x2\x1\x6\x2\x4\x8\x4\x3\x9\x1\x4\x0\x3\x5\x9\x9\x8\x9\x5\x3\x5\x3\x9\x4\x5\x9\x0\x9\x4\x4\x0\x7\x0\x4\x6\x9\x1\x2\x0\x9\x1\x4\x0\x9\x3\x8\x7\x0\x0\x1"	\
 	"\x2\x6\x4\x5\x6\x0\x0\x1\x6\x2\x3\x7\x4\x2\x8\x8\x0\x2\x1\x0\x9\x2\x7\x6\x4\x5\x7\x9\x3\x1\x0\x6\x5\x7\x9\x2\x2\x9\x5\x5\x2\x4\x9\x8\x8\x7\x2\x7\x5\x8\x4\x6\x1\x0\x1\x2\x6\x4\x8\x3\x6\x9\x9\x9\x8\x9\x2\x2\x5\x6\x9\x5\x9\x6\x8\x8\x1\x5\x9\x2\x0\x5\x6\x0\x0\x1\x0\x1\x6\x5\x5\x2\x5\x6\x3\x7\x5\x6\x7\x8";
 
-	constexpr int MAX_KEY_SIZE = 1000;
-	constexpr int HIGH_BYTE = 29;
-	constexpr int LOW_BYTE = 37;
+	constexpr int MIN_KEY_SIZE			= 64;
+	constexpr int MAX_KEY_SIZE			= 1000;
+	constexpr int HIGHBYTE				= 29;
+	constexpr int LOWBYTE				= 37;
 
-	constexpr int TWELVE_MEGABYTES = 12'582'912;
-	constexpr int SIXTEEN_MEGABYTES = 16'777'216;
+	constexpr int ONE_MEGABYTE			= 1'048'576;
+	constexpr int TWELVE_MEGABYTES		= 12'582'912;
+	constexpr int FIFTEEN_MEGABYTES		= 15'728'640;
+	constexpr int SIXTEEN_MEGABYTES		= 16'777'216;
 
-	constexpr int MAX_FILE_SIZE = TWELVE_MEGABYTES;
-	constexpr int MAX_ARRAY_SIZE = SIXTEEN_MEGABYTES;
+	constexpr int MAX_FILE_SIZE			= TWELVE_MEGABYTES;
+	constexpr int MAX_ARRAY_SIZE		= SIXTEEN_MEGABYTES;
 
-	constexpr int SIXTY_FOUR_CUBED = 262'144;
-	constexpr int EIGHT_CUBED = 512;
-	constexpr int FOUR_CUBED = 64;
+	constexpr int SIXTY_FOUR_CUBED		= 262'144;
+	constexpr int EIGHT_CUBED			= 512;
+	constexpr int FOUR_CUBED			= 64;
 
-	constexpr uint16_t RUBIX_SIDE_SIZE = 4;
+	constexpr uint16_t RUBIX_SIDE_SIZE	= 256;
 
-	const std::string FILE_EXTENSION = "khn";
+	const std::string FILE_EXTENSION	= "khn";
+
 
 #ifndef  DEBUG
 #define  DEBUG
@@ -173,15 +177,32 @@ const char PI[] = "\x0\x1\x4\x1\x5\x9\x2\x6\x5\x3\x5\x8\x9\x7\x9\x3\x2\x3\x8\x4\
 #endif					//BRUTE_FORCE
 
 #if BRUTE_FORCE
-	using file_buffer_type = uint8_t;
+	using FILE_BUFFER_TYPE				= uint8_t;
 #else
-	using file_buffer_type = uint32_t;
+	using FILE_BUFFER_TYPE = uint32_t;
 
-	constexpr uint8_t X_OFFSET = 8;
-	constexpr uint8_t Y_OFFSET = 16;
-	constexpr uint8_t Z_OFFSET = 24;
+	constexpr uint8_t X_OFFSET			= 8;
+	constexpr uint8_t Y_OFFSET			= 16;
+	constexpr uint8_t Z_OFFSET			= 24;
 
-	constexpr uint32_t X_MASK = 0XFFFF00FF;
-	constexpr uint32_t Y_MASK = 0XFF00FFFF;
-	constexpr uint32_t Z_MASK = 0X00FFFFFF;
+	constexpr uint32_t X_MASK			= 0XFFFF00FF;
+	constexpr uint32_t Y_MASK			= 0XFF00FFFF;
+	constexpr uint32_t Z_MASK			= 0X00FFFFFF;
 #endif
+
+#ifndef DEBUG_PRINT
+#define DEBUG_PRINT 1
+#endif
+
+//Function prototypes
+void createIndices(std::vector<uint32_t>& fileBuffer);
+bool getKey(std::string inputFile, std::vector<uint8_t>& keyFileBuffer);
+bool parseOptions(int argc, char** argv, std::map<std::string, std::string>& command_line_options);
+void printMatrix(std::string remark, std::vector<FILE_BUFFER_TYPE>& matrix3d);
+bool readFile(std::string input_file, std::vector<uint8_t>& inputFileBuffer, uint32_t minSize, uint32_t maxSize);
+bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool verbose);
+bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool verbose);
+void XORFileAndKey(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key);
+
+template <typename T>
+bool writeFile(std::string output_file, std::vector < T >& fileBuffer);
