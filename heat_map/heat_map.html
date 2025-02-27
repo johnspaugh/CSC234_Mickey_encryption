@@ -8,8 +8,25 @@
 	<div id ="standard-deviation"></div>
 	<div id ="mean"></div>
 	<div id="message"></div>
+	<div id="median"></div>
 </body>
 <script>
+	const get_median = (arr) => {
+		const result = arr.reduce((accumulator, currentValue, index) => {
+  			return parseInt(accumulator) + (parseInt(currentValue));
+		}, 0);
+
+		var position_of_the_median = (result + 1)/2;
+
+		var sum = 0;
+		
+		for (let i = 0; i < arr.length; i++)
+		{
+			sum += arr[i];
+			if (sum >= position_of_the_median)
+				return i;
+		}
+	}
 	const standardDeviation = (arr, usePopulation = false) => {
 		const mean = arr.reduce((acc, val) => acc + val, 0) / arr.length;
 		const sumOfSquaredDifferences = arr.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0);
@@ -32,9 +49,11 @@
 	const get_standard_deviation = () => {
 		const table_data = get_table_data();
 		const statistics = standardDeviation(table_data);
-		
+		const median = get_median(table_data);
+
 		document.getElementById('standard-deviation').textContent = "Standard Deviation: " + statistics.standard_deviation;
 		document.getElementById('mean').textContent = "Mean: " + statistics.mean;
+		document.getElementById('median').textContent = "Median: 0x" + formatHex(median);
 
 		return table_data.map(d => (d - statistics.mean) / statistics.standard_deviation);
 	}
@@ -126,34 +145,34 @@
 		
 	function tableCreate() 
 	{
-	const body = document.body
-			, tbl = document.createElement('table')
-			, header = 	tbl.createTHead();
-	tbl.style.border = '1px solid black';
-	tbl.setAttribute('id', 'table');
+		const body = document.body
+				, tbl = document.createElement('table')
+				, header = 	tbl.createTHead();
+		tbl.style.border = '1px solid black';
+		tbl.setAttribute('id', 'table');
 
-	var row = header.insertRow(0);
-	var cell = row.insertCell(0);
-	for (let i = 0; i < 16; i++)
-	{
-		var cell = row.insertCell(i+1);
-		cell.innerHTML = "<b>0x" + formatHex(i) + "</b>";
-	}
-
-	for (let i = 0; i < 16; i++) 
-	{
-		const tr = tbl.insertRow();
-		for (let j = 0; j <= 16; j++) 
+		var row = header.insertRow(0);
+		var cell = row.insertCell(0);
+		for (let i = 0; i < 16; i++)
 		{
-			const td = tr.insertCell();
-			td.style.border = '1px solid black';
-			if (j == 0)
-				td.innerHTML = "<b>0x"+formatHex(i*16) + "</b>";
-			else
-				td.appendChild(document.createTextNode('0'));
+			var cell = row.insertCell(i+1);
+			cell.innerHTML = "<b>0x" + formatHex(i) + "</b>";
 		}
-	}
-	body.appendChild(tbl);
+
+		for (let i = 0; i < 16; i++) 
+		{
+			const tr = tbl.insertRow();
+			for (let j = 0; j <= 16; j++) 
+			{
+				const td = tr.insertCell();
+				td.style.border = '1px solid black';
+				if (j == 0)
+					td.innerHTML = "<b>0x"+formatHex(i*16) + "</b>";
+				else
+					td.appendChild(document.createTextNode('0'));
+			}
+		}
+		body.appendChild(tbl);
 	}
 
 	tableCreate();
