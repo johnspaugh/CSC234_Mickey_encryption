@@ -19,7 +19,7 @@ std::string truncateString(std::string inputString);
 /**
  * append the number Pie to password selected for comparison
  */
-std::string retrievePassword(std::string password, int passwordNumber);//
+std::string retrievePassword( int keyNumber);//
 
 
 /**
