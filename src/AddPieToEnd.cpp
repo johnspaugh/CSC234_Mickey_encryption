@@ -13,13 +13,13 @@
 using namespace std;
 namespace fs = std::filesystem;
 
-string AddPieToEnd(string password){
+string AddPieToEnd(string key){
 
-    string passwordPadding = NULL;
-    string pieString = readFile("/storage/LittlePieNumbers1K.txt");
+    string KeyPiePadding = NULL;
+    string pieString = readFile("../src/storage/LittlePieNumbers1K.txt");
 
-    passwordPadding = password + pieString;
-    string result = truncateString(passwordPadding);
+    KeyPiePadding = key + pieString;
+    string result = truncateString(KeyPiePadding);
 
     return result;
 }
@@ -39,25 +39,25 @@ string truncateString(string inputString){
     }
 }
 
-string retrievePassword(string password, int passwordNumber){
+string retrievePassword(int keyNumber){
     
     cout << "Testing 2 " << endl;    
-    string ModifiedPassword = "";
-    string pieString = "";
+    string key = "";
+    string KeyPie = ""; 
     //below example
     // string filename = "../../input.txt";
     string filenamePassword1 = "password1.txt";
     string path = "";
     cout << "Testing 3 " << endl;
-    if(passwordNumber == 1){
+    if(keyNumber == 1){
         // string of password
-        path = "/storage/password1.txt";
-    }else if(passwordNumber == 2){
+        path = "../src/storage/key1.txt";
+    }else if(keyNumber == 2){
         //this was picture
-        path = "/storage/password2";
-    }else if(passwordNumber == 3){
+        path = "../src/storage/key2.txt";
+    }else if(keyNumber == 3){
         // string of password
-        path = "/storage/password3.txt";
+        path = "../src/storage/key1.txt";
     }else{
         path = "empty";
         // cout 
@@ -65,24 +65,26 @@ string retrievePassword(string password, int passwordNumber){
         return ""; //NULL;
     }
 
-    ModifiedPassword = readFile(path);
-    ModifiedPassword = AddPieToEnd(ModifiedPassword);
+    key = readFile(path);
+    KeyPie = AddPieToEnd(key);
     
-    return ModifiedPassword;
+    return KeyPie;
 }
 
 string readFile(string path){
 
     std::string output;
     //std::string filePath = "../another_folder/my_text_file.txt"; // Relative path
-    std::string filePath = path; // "/storage/password1.txt";
-    std::ifstream inputFile(filePath);
-
-    if (inputFile.is_open()) {
-        cout << "Testing 4 " << endl;
+    std::string filePath = path; // "./storage/password1.txt";
+    // std::ifstream inputFile(filePath);
+    ifstream file(filePath);
+    
+    cout << "Testing 4 " << endl;
+    if (file.is_open()) {
+        cout << "Testing 5 " << endl;
         std::string fileContent;
-        std::getline(inputFile, fileContent);
-        inputFile.close();
+        std::getline(file, fileContent);
+        file.close();
         std::cout << "Content: " << fileContent << std::endl;
         output = fileContent; 
         // std::cout << output << std::endl;
@@ -92,4 +94,16 @@ string readFile(string path){
 
     //return 0;
     return output;
+}
+
+int main() {
+    string password = "ttt";
+    int keyNumber = 1;
+    string passwordretrived = "";
+    cout << "Testing "<< endl;
+    passwordretrived = retrievePassword(   keyNumber);
+    
+    cout << passwordretrived << endl;
+
+    return 0;
 }
