@@ -96,14 +96,3 @@ string readFile(string path){
     return output;
 }
 
-int main() {
-    string password = "ttt";
-    int keyNumber = 1;
-    string passwordretrived = "";
-    cout << "Testing "<< endl;
-    passwordretrived = retrievePassword(   keyNumber);
-    
-    cout << passwordretrived << endl;
-
-    return 0;
-}

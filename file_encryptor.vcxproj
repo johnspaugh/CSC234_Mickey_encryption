@@ -136,6 +136,10 @@
     <ClInclude Include="file_encryptor.h" />
     <ClInclude Include="huffman.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="AddPieToEnd.h" />
+    <ClInclude Include="AddPieToEnd.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
