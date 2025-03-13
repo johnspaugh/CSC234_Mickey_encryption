@@ -73,6 +73,7 @@
         "xhash": "cpp",
         "*.txt": "cpp",
         "any": "cpp",
-        "bitset": "cpp"
+        "bitset": "cpp",
+        "random": "cpp"
     }
 }

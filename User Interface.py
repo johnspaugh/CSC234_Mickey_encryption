@@ -1,4 +1,5 @@
 import os
+import "Python.h"
 
 def encrypt_file(file_path, key):
     # Placeholder for encryption logic

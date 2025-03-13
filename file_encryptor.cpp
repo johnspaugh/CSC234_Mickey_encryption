@@ -3,6 +3,7 @@
 #include "file_encryptor.h"
 #include "huffman.h"
 
+
 /*
  * This in an intermediate function to create the indices in the 'rubix' array
  * we'll shuffle around.
@@ -653,6 +654,48 @@ void XORFileAndKey(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key)
 */
 int main(int argc, char **argv)
 {
+    //for the user to see the interface. 
+    // std::string command = "User Interface.py";
+    // system(command.c_str());
+    std::cout << ("\nWelcome to the Mickey Encryption Tool!") << std::endl;
+    std::cout << ("1. Encrypt a file")<< std::endl;
+    std::cout << ("2. Decrypt a file") << std::endl;
+    std::cout << ("3. Exit") << std::endl;
+        
+    int choice =0;
+
+    while( choice !=1 && choice !=2 && choice !=3 ){
+        std::cin >> choice;
+        if (choice == 1){
+            std::cout << ("Enter the path of the file to encrypt: ") << std::endl;
+            std::cin >> file_path;// = input
+            if ( ! os.path.exists(file_path) ){
+                std::cout <<("Error: File not found.");
+            } //continue
+            std::cout << ("Enter the encryption key: ") << std::endl;
+            std::cin >> key; // = input
+            encrypt_file(file_path, key);
+            
+        }else if (choice == 2){
+            std::cout << ("Enter the path of the file to decrypt: ") << std::endl;
+            std::cin >> file_path; // = input
+            if ( ! os.path.exists(file_path) ){
+                std::cout <<("Error: File not found.");
+            } //   continue
+            std::cout <<("Enter the decryption key: ") << std::endl;
+            std::cin >> key; // = input
+            decrypt_file(file_path, key);
+            
+        }else if (choice == 3 ){
+            std::cout <<("Exiting... Goodbye!");
+            //break;
+            
+        } else{
+            std::cout <<("Invalid choice. Please enter 1, 2, or 3.");
+        }
+    }
+
+    
     std::map<std::string, std::string> commandLineOptions;
 
     if (parseOptions(argc, argv, commandLineOptions) == false)
