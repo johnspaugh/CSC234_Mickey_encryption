@@ -1,0 +1,2 @@
+This is a sample file to test encryption and decryption.
+The content inside will be encrypted and later decrypted back.
