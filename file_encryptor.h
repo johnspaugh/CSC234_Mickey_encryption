@@ -6,14 +6,14 @@
 */
 #pragma once
 #include <algorithm>
-#include <any>
-#include <bit>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <map>
 #include <queue>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -158,14 +158,12 @@ const char PI[] = "\x0\x1\x4\x1\x5\x9\x2\x6\x5\x3\x5\x8\x9\x7\x9\x3\x2\x3\x8\x4\
 
 	const std::string FILE_EXTENSION	= "khn";
 
+	constexpr uint32_t META_DATA_SIZE	= 1028;
+
 
 #ifndef  DEBUG
 #define  DEBUG
 #endif					//DEBUG
-
-#ifndef DEBUG_OUTPUT
-#define DEBUG_OUTPUT 0
-#endif
 
 /*
 	* This flag determines if we 'brute force' a rotation encryption by shifting values in each
@@ -190,19 +188,17 @@ const char PI[] = "\x0\x1\x4\x1\x5\x9\x2\x6\x5\x3\x5\x8\x9\x7\x9\x3\x2\x3\x8\x4\
 	constexpr uint32_t Z_MASK			= 0X00FFFFFF;
 #endif
 
-#ifndef DEBUG_PRINT
-#define DEBUG_PRINT 1
-#endif
-
 //Function prototypes
-void createIndices(std::vector<uint32_t>& fileBuffer);
-bool getKey(std::string inputFile, std::vector<uint8_t>& keyFileBuffer);
-bool parseOptions(int argc, char** argv, std::map<std::string, std::string>& command_line_options);
-void printMatrix(std::string remark, std::vector<FILE_BUFFER_TYPE>& matrix3d);
-bool readFile(std::string input_file, std::vector<uint8_t>& inputFileBuffer, uint32_t minSize, uint32_t maxSize);
-bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool verbose);
-bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool verbose);
-void XORFileAndKey(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key);
+void		addPadding(std::vector<uint32_t>& vec, uint32_t index);
+void		createIndices(std::vector<uint32_t>& fileBuffer);
+bool		decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool verbose);
+bool		encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool verbose);
+bool		getKey(std::string inputFile, std::vector<uint8_t>& keyFileBuffer);
+uint32_t	getPrime(uint8_t index);
+bool		parseOptions(int argc, char** argv, std::map<std::string, std::string>& command_line_options);
+void		printMatrix(std::string remark, std::vector<FILE_BUFFER_TYPE>& matrix3d);
+bool		readFile(std::string input_file, std::vector<uint8_t>& inputFileBuffer, uint32_t minSize, uint32_t maxSize);
+void		XORFileAndKey(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key);
 
 template <typename T>
-bool writeFile(std::string output_file, std::vector < T >& fileBuffer);
+bool		writeFile(std::string output_file, std::vector < T >& fileBuffer);
