@@ -206,101 +206,43 @@ bool readFile(std::string inputFile, std::vector<uint8_t>& inputFileBuffer, uint
     return true;
 }
 
-#if BRUTE_FORCE
 /*
- * This function rotates a 'row' in the 'x' direction an amount specified. We use
- * std::rotate as it has the wrap function specified.
+ * This function finds a prime number for the final shuffle. In the event the prime
+ * number is a factor of the maximum file size, we'll keep increasing until we find a 
+ * suitable value.
+ * 
  *
- * @param   input               buffer to file to encrypt
- * @param   key                 key dictating how much to shift each row
- * @return  void
-*/
-void shiftX(std::vector<FILE_BUFFER_TYPE>& input, std::vector<uint8_t>& key, bool decode)
+ * @param index                     start at the specified value from the key
+ *
+ * @return                          prime number not a factor of maximum file size
+ */
+uint32_t getPrime(uint8_t index)
 {
-    // Reinterpret the array with different indices
-    FILE_BUFFER_TYPE(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] = reinterpret_cast<FILE_BUFFER_TYPE(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(input.data());
+    while (SIXTEEN_MEGABYTES % primes[index] == 0)
+        index++;
 
-    uint8_t keyIndex = 0;
-    for (int x = 0; x < RUBIX_SIDE_SIZE; x++)
-        for (int y = 0; y < RUBIX_SIDE_SIZE; y++)
-            if (decode)
-                std::rotate(std::begin((*p)[x][y]), std::begin((*p)[x][y]) + key[y], std::end((*p)[x][y]));
-            else
-                std::rotate(std::rbegin((*p)[x][y]), std::rbegin((*p)[x][y]) + key[y], std::rend((*p)[x][y]));
+    return primes[index];
 }
 
 /*
- * This function rotates a 'column' in the 'y' direction an amount specified. We use
- * std::rotate as it has the wrap function specified. I don't know if there's a better
- * method than removing the column, rotating it, then putting it back.
+ * This function adds random values to the buffer. Random values adds another layer
+ * of security as it hides the length of encoded bytes.
+ * 
+ * @param vec                       std::vector buffer to pad
+ * @param pos                       start postion for adding random values
  *
- * @param   input               file buffer to decrypt
- * @param   key                 key dictating how much to shift each column
- * @return  void
+ * @return                          void
 */
-void shiftY(std::vector<FILE_BUFFER_TYPE>& input, std::vector<uint8_t>& key, bool decode)
+void addPadding(std::vector<uint32_t>& vec, uint32_t pos)
 {
-    // Reinterpret the array with different indices
-    FILE_BUFFER_TYPE(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] = reinterpret_cast<FILE_BUFFER_TYPE(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(input.data());
+    std::random_device rd;  // a seed source for the random number engine
+    std::mt19937 gen(rd()); // mersenne_twister_engine seeded with rd()
+    std::uniform_int_distribution<> distrib(0, 0xff);
 
-    for (uint8_t x = 0; x < RUBIX_SIDE_SIZE; x++)
-    {
-        uint8_t keyIndex = 0;
-        for (uint8_t z = 0; z < RUBIX_SIDE_SIZE; z++)
-        {
-            std::vector<FILE_BUFFER_TYPE> temp(RUBIX_SIDE_SIZE);
-            for (uint8_t y = 0; y < RUBIX_SIDE_SIZE; y++)
-                temp[y] = (*p)[x][y][z];
-
-            if (decode)
-                std::rotate(temp.begin(), temp.begin() + key[keyIndex], temp.end());
-            else
-                std::rotate(temp.rbegin(), temp.rbegin() + key[keyIndex], temp.rend());
-
-            for (uint8_t y = 0; y < RUBIX_SIDE_SIZE; y++)
-                (*p)[x][y][z] = temp[y];
-            keyIndex = (keyIndex + 1) % RUBIX_SIDE_SIZE;
-        }
-    }
+    for (uint32_t i = pos; i < SIXTEEN_MEGABYTES - META_DATA_SIZE; i++)
+        vec[i] = distrib(gen);
 }
 
-/*
- * This function rotates a 'drawer' in the 'z' direction an amount specified. We use
- * std::rotate as it has the wrap function specified.
- *
- * @TODO: implement using std::rotate. we'll probably have to write the 'drawer' to a temporary
- * buffer, rotate it, then write it back. I think it'll cost the same as trying to rotate in place.
- *
- * @param   input               file buffer to decrypt
- * @param   key                 key dictating how much to shift each column
- * @return  void
-*/
-void shiftZ(std::vector<FILE_BUFFER_TYPE>& input, std::vector<uint8_t>& key, bool decode)
-{
-    // Reinterpret the array with different indices
-    FILE_BUFFER_TYPE(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] = reinterpret_cast<FILE_BUFFER_TYPE(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(input.data());
-
-    for (uint8_t z = 0; z < RUBIX_SIDE_SIZE; z++)
-    {
-        uint8_t keyIndex = 0;
-        for (uint8_t y = 0; y < RUBIX_SIDE_SIZE; y++)
-        {
-            std::vector<FILE_BUFFER_TYPE> temp(RUBIX_SIDE_SIZE);
-            for (uint8_t x = 0; x < RUBIX_SIDE_SIZE; x++)
-                temp[x] = (*p)[x][y][z];
-
-            if (decode)
-                std::rotate(temp.begin(), temp.begin() + key[keyIndex], temp.end());
-            else
-                std::rotate(temp.rbegin(), temp.rbegin() + key[z], temp.rend());
-
-            for (uint8_t x = 0; x < RUBIX_SIDE_SIZE; x++)
-                (*p)[x][y][z] = temp[x];
-            keyIndex = (keyIndex + 1) % RUBIX_SIDE_SIZE;
-        }
-    }
-}
-#else
 /*
  * This is the main driver for encoding the file. We parse out the filename before
  * we do anything so we know what to call it later when we write the output file.
@@ -339,15 +281,15 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     if (verbose)    std::cout << "XOR file and key." << std::endl;
 
     /*
-    * XOR the key against the array in 1K chunks (run down the full array)
-    */
+     * XOR the key against the array in 1K chunks (run down the full array)
+     */
     XORFileAndKey(fileBuffer, key);
 
     if (verbose)    std::cout << "Huffman Encoding." << std::endl;
 
     /*
-    * Perform Huffman encoding of resulting array, creating array�
-    */
+     * Perform Huffman encoding of resulting array, creating array
+     */
     std::array<uint32_t, 256> freq = { 0 };
     std::vector<uint8_t> encodedBytes;
     uint32_t stringLength = 0;
@@ -360,46 +302,48 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     if (verbose)    std::cout << "Rubix shuffle." << std::endl;
 
     /*
-    * Load array' into the Rubix array
-    */
+     * Load array' into the Rubix array
+     */
     std::vector<uint32_t> rubix = { 0 };
     std::copy(encodedBytes.begin(), encodedBytes.end(), std::back_inserter(rubix));
     rubix.erase(rubix.begin());
 
     /*
-    * Let's clear these vectors since we don't need them anymore.
-    * They'll probably be cleaned up with the garbage collection, but we're
-    * now using 64 MB of memory and these are unnecessary.
-    */
+     * Let's clear these vectors since we don't need them anymore.
+     * They'll probably be cleaned up with the garbage collection, but we're
+     * now using 64 MB of memory and these are unnecessary.
+     */
     encodedBytes.clear();
     fileBuffer.clear();
 
     rubix.resize(SIXTEEN_MEGABYTES);
 
     /*
-    * we need to keep the frequency map to huffman decode, since we're not using the last
-    * 4 megabytes, we'll just stick it there
-    */
+     * we need to keep the frequency map to huffman decode, since we're not using the last
+     * 4 megabytes, we'll just stick it there
+     */
     for (uint16_t i = 0; i < freq.size(); i++)
         for (uint8_t j = 0; j < sizeof(uint32_t); j++)
-            rubix[rubix.size() - 1024 + (i * 4) + j] = uint32_t(freq[i] >> (j * 8)) & 0xff;
+            rubix[SIXTEEN_MEGABYTES - 1024 + (i * 4) + j] = uint32_t(freq[i] >> (j * 8)) & 0xff;
 
+    addPadding(rubix, stringLength);
 
     /*
-    * we also need to keep the length of the huffman encoded string to pass back to the decoder
-    * we'll just stick it right before the frequency map
-    */
+     * we also need to keep the length of the huffman encoded string to pass back to the decoder
+     * we'll just stick it right before the frequency map
+     */
     for (uint8_t j = 0; j < sizeof(uint32_t); j++)
-        rubix[rubix.size() - 1028 + j] = uint32_t(stringLength >> (j*8)) & 0xff;
+        rubix[SIXTEEN_MEGABYTES - META_DATA_SIZE + j] = uint32_t(stringLength >> (j*8)) & 0xff;
 
     createIndices(rubix);
 
+    // Cast the buffer to a pointer instead of loading to a separate array
     FILE_BUFFER_TYPE(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
         reinterpret_cast<FILE_BUFFER_TYPE(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(rubix.data());
 
     /*
-    * 'Rubix' shift array
-    */
+     * 'Rubix' shift array
+     */
     for (uint16_t z = 0; z < RUBIX_SIDE_SIZE; z++)
         for (uint16_t y = 0; y < RUBIX_SIDE_SIZE; y++)
             for (uint16_t x = 0; x < RUBIX_SIDE_SIZE; x++)
@@ -422,6 +366,21 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
                 (*p)[z][y][xLoc] |= (currentZLocation << Z_OFFSET);
             }
 
+    std::sort(rubix.begin(), rubix.end());
+
+    if (verbose)    std::cout << "Shuffle array." << std::endl;
+
+    /*
+     * This is the final shuffle in the encryption. We put a byte in to an empty slot based on a prime
+     * number selected from the primes array and the 59th byte from the key.
+     */
+    uint32_t prime = getPrime(key[59]);
+    uint32_t counter = 1;
+    for (uint32_t i = 1; i < rubix.size(); i++)
+    {
+        rubix[rubix.size() - (i * prime) % rubix.size()] &= 0xff;
+        rubix[rubix.size() - (i * prime) % rubix.size()] |= counter++ << 8;
+    }
     std::sort(rubix.begin(), rubix.end());
 
     if (verbose)    std::cout << "Write encrypted file." << std::endl;
@@ -456,25 +415,35 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
 bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool verbose)
 {
     /*
-     * 3. Perform steps 9 & 10 to build the Shuffle map
-     * 4. Reverse step 11 � move elements from the input array into the Rubix array
-     */ 
-
-    if (verbose)    std::cout << "Rubix shuffle." << std::endl;
-
-
-     /*
-      * Load array' into the Rubix array
-      */
+     * Load array' into the Rubix array
+     */
     std::vector<uint32_t> rubix;
     std::copy(fileBuffer.begin(), fileBuffer.end(), std::back_inserter(rubix));
 
+    /*
+     * 3. Perform steps 9 & 10 to build the Shuffle map
+     * 4. Reverse step 11 - move elements from the input array into the Rubix array
+     */ 
+    if (verbose)    std::cout << "Unshuffle array." << std::endl;
+
+    uint32_t prime = getPrime(key[59]);
+    uint32_t counter = 1;
+    for (uint32_t i = 1; i < rubix.size(); i++)
+        rubix[counter++] |= (rubix.size() - ((i * prime) % rubix.size())) << 8;
+
+    std::sort(rubix.begin(), rubix.end());
+
+    if (verbose)    std::cout << "Rubix shuffle." << std::endl;
+
+    /*
+     * 'Rubix' unshuffling, in place
+     */
     createIndices(rubix);
 
+    // We, again, cast the buffer to a pointer instead of loading to a separate array
     FILE_BUFFER_TYPE(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
         reinterpret_cast<FILE_BUFFER_TYPE(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(rubix.data());
 
-    uint32_t debug = 0;
     for (int16_t z = 0; z < RUBIX_SIDE_SIZE; z++)
     {
         for (int16_t y = 0; y < RUBIX_SIDE_SIZE; y++)
@@ -507,6 +476,8 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     /*
      * 9. Perform Huffman decoding to create array from array (implement last)
      */
+    // we need to get the frequency map from the end of the buffer as Huffman can't
+    // recreate it
     std::array<uint32_t, 256> freq = { 0 };
     for (int i = 0; i < freq.size(); i++)
     {
@@ -515,10 +486,13 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
             freq[i] |= (rubix[j]&0xff) << ((j % 4) * 8);
     }
 
+    // We need to get the length of the huffman encoded string so we know how much
+    // to truncate before passing it to the decode function
     uint32_t stringLength = 0;
     for (size_t j = rubix.size()-1028; j < rubix.size()-1024; j++)
         stringLength |= (rubix[j] & 0xff) << ((j % 4) * 8);
 
+    // create the Huffman string to decode
     std::vector<uint8_t> decodedBytes;
     std::string input;
     
@@ -565,8 +539,8 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     std::string outputFilename(decodedBytes.begin() + 4, decodedBytes.begin() + 4 + fileNameLength);
 
     /*
-    * Erase the 3 byte header and file name from the buffer
-    */
+     * Erase the 3 byte header and file name from the buffer
+     */
     decodedBytes.erase(decodedBytes.begin(), decodedBytes.begin() + 4 + fileNameLength);
     decodedBytes.erase(decodedBytes.begin() + fileSize, decodedBytes.end());
 
@@ -575,7 +549,6 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     /*
      * 12. Create output file with correct suffix using string length
      */
-    outputFilename = "1" + outputFilename;
     if (writeFile<uint8_t>(outputFilename, decodedBytes) == false)
     {
         std::cerr << "Error writing file." << std::endl;
@@ -584,7 +557,6 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
 
     return true;
 }
-#endif      //BRUTE_FORCE
 
 /*
  * This function writes the encripted file to disk. I've templated it 
@@ -599,6 +571,43 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
 template <typename T>
 bool writeFile(std::string outputFile, std::vector < T > & fileBuffer)
 {
+    /*
+     * Check if output file already exists. If it does, do we want to 
+     * overwrite it or rename it?
+     * 
+     * C++ doesn't have a portable way to only get the character without
+     * user pressing ENTER, so we have to make sure any extra characters
+     * don't interfere.
+     */
+    while (std::filesystem::exists(outputFile))
+    {
+        std::cout << outputFile << " already exists.";
+        int ch;
+        do
+        {
+            std::cout << "\n[O]verwrite or [R]ename ? ";
+            ch = toupper(std::getchar());
+
+            // Ignore to the end of line
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+            // reset the stream state.
+            std::cin.clear();
+        } while ((ch != 'O') && (ch != 'R'));
+
+        if (ch == 'O')
+            break;
+
+        std::cout << "Enter new Filename: ";
+        std::cin >> outputFile;
+
+        // Ignore to the end of line
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+        // reset the stream state.
+        std::cin.clear();
+    }
+
     // Open the file in binary mode
     std::ofstream outfile(outputFile, std::ios::binary);
 
@@ -624,8 +633,6 @@ bool writeFile(std::string outputFile, std::vector < T > & fileBuffer)
  * This function writes the XORs the file to encrypt with the key in 1000 byte chunks using
  * MAX_KEY_SIZE defined in the header.
  *
- * @TODO:
- *
  * @param   fileBuffer               file buffer to write
  * @param   key                       prepared key
  * @return  bool
@@ -633,7 +640,7 @@ bool writeFile(std::string outputFile, std::vector < T > & fileBuffer)
 void XORFileAndKey(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key)
 {
     int i = 0;
-    for (auto b : fileBuffer)
+    for (uint8_t &b : fileBuffer)
     {
         b ^= key[i];
         i = (i + 1) % MAX_KEY_SIZE;
@@ -644,9 +651,6 @@ void XORFileAndKey(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key)
  * This function main entry point of the program. Used mainly as driver to parse the command line
  * options, get the encyption key, and read in the file to encrypt. Will print to standard error if
  * we encounter a problem with any of the parsing/reading so far.
- *
- * TODO: huffman functions taken from web in another file, need to incorporate to this one before doing
- * the rubix shuffle. Also need to figure out how to write the rubix array to the output file.
  *
  * @param   argc                    number of command line parameters
  * @param   argv                    command line parameters
@@ -729,7 +733,6 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
-
     if (commandLineOptions["direction"] == "encode")
     {
         /*
@@ -766,14 +769,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
