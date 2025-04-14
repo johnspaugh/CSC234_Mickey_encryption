@@ -165,6 +165,10 @@ const char PI[] = "\x0\x1\x4\x1\x5\x9\x2\x6\x5\x3\x5\x8\x9\x7\x9\x3\x2\x3\x8\x4\
 #define  DEBUG
 #endif					//DEBUG
 
+#define TIMER	1
+
+
+
 /*
 	* This flag determines if we 'brute force' a rotation encryption by shifting values in each
 	* dimension, or spend some memory to move indexes around.

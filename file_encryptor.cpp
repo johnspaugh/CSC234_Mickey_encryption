@@ -3,6 +3,11 @@
 #include "file_encryptor.h"
 #include "huffman.h"
 
+#if TIMER
+#include <chrono>
+std::vector<std::chrono::time_point<std::chrono::steady_clock>> times;
+#endif					// TIMER
+
 /*
  * This in an intermediate function to create the indices in the 'rubix' array
  * we'll shuffle around.
@@ -279,12 +284,20 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
 
     if (verbose)    std::cout << "XOR file and key." << std::endl;
 
+#if TIMER
+    times.push_back(std::chrono::steady_clock::now());
+#endif
+
     /*
      * XOR the key against the array in 1K chunks (run down the full array)
      */
     XORFileAndKey(fileBuffer, key);
 
     if (verbose)    std::cout << "Huffman Encoding." << std::endl;
+
+#if TIMER
+    times.push_back(std::chrono::steady_clock::now());
+#endif
 
     /*
      * Perform Huffman encoding of resulting array, creating array
@@ -299,6 +312,10 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     }
 
     if (verbose)    std::cout << "Rubix shuffle." << std::endl;
+
+#if TIMER
+    times.push_back(std::chrono::steady_clock::now());
+#endif
 
     /*
      * Load array' into the Rubix array
@@ -369,6 +386,10 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
 
     if (verbose)    std::cout << "Shuffle array." << std::endl;
 
+#if TIMER
+    times.push_back(std::chrono::steady_clock::now());
+#endif
+
     /*
      * This is the final shuffle in the encryption. We put a byte in to an empty slot based on a prime
      * number selected from the primes array and the 59th byte from the key.
@@ -384,6 +405,10 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
 
     if (verbose)    std::cout << "Write encrypted file." << std::endl;
 
+#if TIMER
+    times.push_back(std::chrono::steady_clock::now());
+#endif
+
     /*
      * write output file
      */
@@ -393,6 +418,9 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
         return false;
     }
 
+#if TIMER
+    times.push_back(std::chrono::steady_clock::now());
+#endif
     return true;
 
 }
@@ -628,6 +656,22 @@ bool writeFile(std::string outputFile, std::vector < T > & fileBuffer)
     return true;
 }
 
+#if TIMER
+void writeTimeStats()
+{
+    std::array<std::string, 6> labels = { {"XOR = ", "HUFFMAN = ","RUBIX = ","SHUFFLE = ","WRITE = "} };
+    std::cout << std::fixed << std::setprecision(9) << std::left;
+
+    for (uint8_t i = 1; i < times.size(); i++)
+    {
+        std::chrono::duration<double> diff = times[i] - times[i-1];
+        std::cout << diff << '\t';
+    }
+
+    std::chrono::duration<double> diff = times[times.size()-1] - times[0];
+    std::cout << diff << '\n';
+}
+#endif
 /*
  * This function writes the XORs the file to encrypt with the key in 1000 byte chunks using
  * MAX_KEY_SIZE defined in the header.
@@ -707,13 +751,14 @@ int main(int argc, char **argv)
          */
         fileBuffer.insert(fileBuffer.begin() + 4, commandLineOptions["encryptFile"].begin(), commandLineOptions["encryptFile"].end());
 
-        //TODO: pad input file with 'random noise'
-
         if (encode(fileBuffer, key, commandLineOptions["verbose"] == "true") == false)
         {
             std::cerr << "Error encoding file." << std::endl;
             exit(1);
         }
+#if TIMER
+        writeTimeStats();
+#endif
     }
     else
     {
