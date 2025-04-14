@@ -17,4 +17,3 @@ The input file is XOR'd with the key, encoded using the Huffman algorithm to bre
 -	decode 		decode flag, use to decrypt file
 - -k <key file name>		file name of the key used for encryption/decryption must be at least 64 bytes
 -	-f <file to encrypt>	file name of the file to encrypt/decrypt
-=======
