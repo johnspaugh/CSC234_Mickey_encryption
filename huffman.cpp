@@ -22,7 +22,7 @@
 * 
 * @return   none
 */
-static void generateCodes(Node* root, std::string code, std::map<unsigned char, std::string>& codes)
+void generateCodes(Node* root, std::string code, std::map<unsigned char, std::string>& codes)
 {
     if (root == nullptr) return;
 

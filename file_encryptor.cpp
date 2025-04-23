@@ -57,9 +57,9 @@ bool getKey(std::string inputFile, std::vector<uint8_t>& keyFileBuffer)
         return false;
     }
 
-    uint16_t keySize = static_cast<uint16_t>(keyFileBuffer.size());
-
+    int keySize = static_cast<int>(keyFileBuffer.size());
     keyFileBuffer.resize(MAX_KEY_SIZE, 0);
+
     if (keySize < MAX_KEY_SIZE)
     {
         uint8_t start = ((keyFileBuffer[HIGHBYTE % keySize] * 10) + keyFileBuffer[LOWBYTE] % keySize);
@@ -351,7 +351,7 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     for (uint8_t j = 0; j < sizeof(uint32_t); j++)
         rubix[SIXTEEN_MEGABYTES - META_DATA_SIZE + j] = uint32_t(stringLength >> (j*8)) & 0xff;
 
-    createIndices(rubix);
+    //createIndices(rubix);
 
     // Cast the buffer to a pointer instead of loading to a separate array
     FILE_BUFFER_TYPE(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
@@ -364,21 +364,15 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
         for (uint16_t y = 0; y < RUBIX_SIDE_SIZE; y++)
             for (uint16_t x = 0; x < RUBIX_SIDE_SIZE; x++)
             {
-                uint32_t currentXLocation = (*p)[z][y][x] >> X_OFFSET;
-                (*p)[z][y][x] &= X_MASK;
-                currentXLocation = ((currentXLocation + key[y]) % RUBIX_SIDE_SIZE);
+                uint32_t currentXLocation =((x + key[y]) % RUBIX_SIDE_SIZE);
                 (*p)[z][y][x] |= (currentXLocation << X_OFFSET);
 
                 int16_t xLoc = ((x - key[y]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
 
-                uint32_t currentYLocation = ((*p)[z][y % RUBIX_SIDE_SIZE][xLoc] & ~Y_MASK) >> Y_OFFSET;
-                (*p)[z][y % RUBIX_SIDE_SIZE][xLoc] &= (Y_MASK);
-                currentYLocation = ((currentYLocation + key[x]) % RUBIX_SIDE_SIZE);
+                uint32_t currentYLocation = ((y + key[x]) % RUBIX_SIDE_SIZE);
                 (*p)[z][y % RUBIX_SIDE_SIZE][xLoc] |= (currentYLocation << Y_OFFSET);
 
-                uint32_t currentZLocation = ((*p)[z][y][xLoc] & ~Z_MASK) >> Z_OFFSET;
-                (*p)[z][y][xLoc] &= (Z_MASK);
-                currentZLocation = (((currentZLocation + key[x]) % RUBIX_SIDE_SIZE));
+                uint32_t currentZLocation = (((z + key[x]) % RUBIX_SIDE_SIZE));
                 (*p)[z][y][xLoc] |= (currentZLocation << Z_OFFSET);
             }
 
@@ -453,6 +447,10 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
      */ 
     if (verbose)    std::cout << "Unshuffle array." << std::endl;
 
+#if TIMER
+    times.push_back(std::chrono::steady_clock::now());
+#endif
+
     uint32_t prime = getPrime(key[59]);
     uint32_t counter = 1;
     for (uint32_t i = 1; i < rubix.size(); i++)
@@ -461,11 +459,14 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     std::sort(rubix.begin(), rubix.end());
 
     if (verbose)    std::cout << "Rubix shuffle." << std::endl;
+#if TIMER
+    times.push_back(std::chrono::steady_clock::now());
+#endif
 
     /*
      * 'Rubix' unshuffling, in place
      */
-    createIndices(rubix);
+    //createIndices(rubix);
 
     // We, again, cast the buffer to a pointer instead of loading to a separate array
     FILE_BUFFER_TYPE(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
@@ -477,22 +478,25 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
         {
             for (int16_t x = 0; x < RUBIX_SIDE_SIZE; x++)
             {
-                int32_t currentZLocation = ((*p)[z][y][x] & ~Z_MASK) >> Z_OFFSET;
                 (*p)[z][y][x] &= (Z_MASK);
-                currentZLocation = ((currentZLocation - key[x]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
+                //int32_t currentZLocation = ((*p)[z][y][x] & ~Z_MASK) >> Z_OFFSET;
+                //currentZLocation = ((currentZLocation - key[x]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
+                int32_t currentZLocation = ((z - key[x]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
                 (*p)[z][y][x] |= (currentZLocation << Z_OFFSET);
 
-                int32_t currentYLocation = ((*p)[z][y][x] & ~Y_MASK) >> Y_OFFSET;
                 (*p)[z][y][x] &= (Y_MASK);
-                currentYLocation = ((currentYLocation - key[x]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
+                //int32_t currentYLocation = ((*p)[z][y][x] & ~Y_MASK) >> Y_OFFSET;
+                //currentYLocation = ((currentYLocation - key[x]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
+                int32_t currentYLocation = ((y - key[x]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
                 (*p)[z][y][x] |= (currentYLocation << Y_OFFSET);
 
                 int16_t yLoc = (y + key[x]) % RUBIX_SIDE_SIZE
                     , zLoc = (z + key[x]) % RUBIX_SIDE_SIZE;
 
-                int32_t currentXLocation = ((*p)[zLoc][yLoc][x] & ~X_MASK) >> X_OFFSET;
                 (*p)[zLoc][yLoc][x] &= X_MASK;
-                currentXLocation = ((currentXLocation - key[y]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
+                //int32_t currentXLocation = ((*p)[zLoc][yLoc][x] & ~X_MASK) >> X_OFFSET;
+                //currentXLocation = ((currentXLocation - key[y]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
+                int32_t currentXLocation = ((x - key[y]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
                 (*p)[zLoc][yLoc][x] |= (currentXLocation << X_OFFSET);
             }
         }
@@ -503,6 +507,11 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     /*
      * 9. Perform Huffman decoding to create array from array (implement last)
      */
+    if (verbose)    std::cout << "Huffman decoding." << std::endl;
+#if TIMER
+    times.push_back(std::chrono::steady_clock::now());
+#endif
+
     // we need to get the frequency map from the end of the buffer as Huffman can't
     // recreate it
     std::array<uint32_t, 256> freq = { 0 };
@@ -532,7 +541,6 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
 
     input.resize(stringLength);
 
-    if (verbose)    std::cout << "Huffman decoding." << std::endl;
 
     if ( huffmanDecode(input, freq, decodedBytes) ==false)
     {
@@ -541,6 +549,10 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     }
 
     if (verbose)    std::cout << "XOR file and key." << std::endl;
+
+#if TIMER
+    times.push_back(std::chrono::steady_clock::now());
+#endif
 
     /*
      * 10. Perform encrypt step 3 (XOR)
@@ -554,6 +566,10 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
      *      1 byte for file name length
      *      file name
      */
+    if (verbose)    std::cout << "Write decrypted file." << std::endl;
+#if TIMER
+    times.push_back(std::chrono::steady_clock::now());
+#endif
 
     // read 3 bytes for the size of the file.
     uint32_t fileSize = 0;
@@ -571,7 +587,6 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     decodedBytes.erase(decodedBytes.begin(), decodedBytes.begin() + 4 + fileNameLength);
     decodedBytes.erase(decodedBytes.begin() + fileSize, decodedBytes.end());
 
-    if (verbose)    std::cout << "Write decrypted file." << std::endl;
 
     /*
      * 12. Create output file with correct suffix using string length
@@ -581,6 +596,9 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
         std::cerr << "Error writing file." << std::endl;
         return false;
     }
+#if TIMER
+    times.push_back(std::chrono::steady_clock::now());
+#endif
 
     return true;
 }
@@ -767,6 +785,9 @@ int main(int argc, char **argv)
             std::cerr << "Error encoding file." << std::endl;
             exit(1);
         }
+#if TIMER
+        writeTimeStats();
+#endif
     }
 
     return 0;
