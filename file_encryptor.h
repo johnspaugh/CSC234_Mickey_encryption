@@ -17,6 +17,23 @@
 #include <string>
 #include <vector>
 
+/*
+ * we need this for strcmp for non-visual studio compilers
+ * 
+ * currently, printing std::chrono::duration not supported by STL in all compilers
+ * it's available in Microsoft Visual C++ compiler
+ */
+#ifndef _WIN32_
+#include <cstring>
+#define TIMER 1
+#if TIMER
+#include <chrono>
+static std::vector<std::chrono::time_point<std::chrono::steady_clock>> times;
+#endif					// TIMER
+#else
+#define TIMER	0
+#endif
+
 const uint32_t primes[] = {
 	2503,   2741,   10007,  12451,  17489,  17789,  28277,  32491,  36109,  39623,  42071,  43427,  55213,  55343,  64381,  64499,
 	65327,  68899,  69497,  72101,  73589,  79159,  80231,  82373,  91433,  93629,  93719,  100183, 102911, 104707, 105331, 111263,
@@ -161,26 +178,7 @@ const char PI[] = "\x0\x1\x4\x1\x5\x9\x2\x6\x5\x3\x5\x8\x9\x7\x9\x3\x2\x3\x8\x4\
 	constexpr uint32_t META_DATA_SIZE	= 1028;
 
 
-#ifndef  DEBUG
-#define  DEBUG
-#endif					//DEBUG
 
-#define TIMER	0
-
-
-
-/*
-	* This flag determines if we 'brute force' a rotation encryption by shifting values in each
-	* dimension, or spend some memory to move indexes around.
-	*
-*/
-#ifndef BRUTE_FORCE
-#define BRUTE_FORCE 0
-#endif					//BRUTE_FORCE
-
-#if BRUTE_FORCE
-	using FILE_BUFFER_TYPE				= uint8_t;
-#else
 	using FILE_BUFFER_TYPE = uint32_t;
 
 	constexpr uint8_t X_OFFSET			= 8;
@@ -190,11 +188,9 @@ const char PI[] = "\x0\x1\x4\x1\x5\x9\x2\x6\x5\x3\x5\x8\x9\x7\x9\x3\x2\x3\x8\x4\
 	constexpr uint32_t X_MASK			= 0XFFFF00FF;
 	constexpr uint32_t Y_MASK			= 0XFF00FFFF;
 	constexpr uint32_t Z_MASK			= 0X00FFFFFF;
-#endif
 
 //Function prototypes
 void		addPadding(std::vector<uint32_t>& vec, uint32_t index);
-void		createIndices(std::vector<uint32_t>& fileBuffer);
 bool		decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool verbose);
 bool		encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool verbose);
 bool		getKey(std::string inputFile, std::vector<uint8_t>& keyFileBuffer);

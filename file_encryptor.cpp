@@ -3,40 +3,7 @@
 #include "file_encryptor.h"
 #include "huffman.h"
 
-#if TIMER
-#include <chrono>
-std::vector<std::chrono::time_point<std::chrono::steady_clock>> times;
-#endif					// TIMER
 
-/*
- * This in an intermediate function to create the indices in the 'rubix' array
- * we'll shuffle around.
- * 
- * @param fileBuffer                'rubix' array to add indices to
- * 
- * @return                          void
- */
-void createIndices(std::vector<uint32_t>& fileBuffer)
-{
-    uint32_t(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
-        reinterpret_cast<uint32_t(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(fileBuffer.data());
-
-    /*
-    * We're marking the current location of each byte in the cube array for 'shifting'
-    */
-    for (uint16_t z = 0; z < RUBIX_SIDE_SIZE; z++)
-    {
-        for (uint16_t y = 0; y < RUBIX_SIDE_SIZE; y++)
-        {
-            for (uint16_t x = 0; x < RUBIX_SIDE_SIZE; x++)
-            {
-                (*p)[z][y][x] |= (x << X_OFFSET);
-                (*p)[z][y][x] |= (y << Y_OFFSET);
-                (*p)[z][y][x] |= (z << Z_OFFSET);
-            }
-        }
-    }
-}
 
 /*
  * This function gets the key from the specified file passed in. We create an fstream with the
@@ -144,11 +111,7 @@ void printMatrix(std::string remark, std::vector<FILE_BUFFER_TYPE>& matrix3d)
         {
             for (uint16_t k = 0; k < RUBIX_SIDE_SIZE; k++)
                 std::cout << std::hex << std::setw(8) << std::setfill('0')
-#if BRUTE_FORCE
-                << int((*p)[i][j][k]) << " ";
-#else
-                << FILE_BUFFER_TYPE((*p)[i][j][k]) << " ";
-#endif
+                    << FILE_BUFFER_TYPE((*p)[i][j][k]) << " ";
             std::cout << std::endl;
         }
         std::cout << std::endl;
@@ -351,8 +314,6 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     for (uint8_t j = 0; j < sizeof(uint32_t); j++)
         rubix[SIXTEEN_MEGABYTES - META_DATA_SIZE + j] = uint32_t(stringLength >> (j*8)) & 0xff;
 
-    //createIndices(rubix);
-
     // Cast the buffer to a pointer instead of loading to a separate array
     FILE_BUFFER_TYPE(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
         reinterpret_cast<FILE_BUFFER_TYPE(*)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE]>(rubix.data());
@@ -466,7 +427,6 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     /*
      * 'Rubix' unshuffling, in place
      */
-    //createIndices(rubix);
 
     // We, again, cast the buffer to a pointer instead of loading to a separate array
     FILE_BUFFER_TYPE(*p)[RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE][RUBIX_SIDE_SIZE] =
@@ -479,14 +439,10 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
             for (int16_t x = 0; x < RUBIX_SIDE_SIZE; x++)
             {
                 (*p)[z][y][x] &= (Z_MASK);
-                //int32_t currentZLocation = ((*p)[z][y][x] & ~Z_MASK) >> Z_OFFSET;
-                //currentZLocation = ((currentZLocation - key[x]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
                 int32_t currentZLocation = ((z - key[x]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
                 (*p)[z][y][x] |= (currentZLocation << Z_OFFSET);
 
                 (*p)[z][y][x] &= (Y_MASK);
-                //int32_t currentYLocation = ((*p)[z][y][x] & ~Y_MASK) >> Y_OFFSET;
-                //currentYLocation = ((currentYLocation - key[x]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
                 int32_t currentYLocation = ((y - key[x]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
                 (*p)[z][y][x] |= (currentYLocation << Y_OFFSET);
 
@@ -494,8 +450,6 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
                     , zLoc = (z + key[x]) % RUBIX_SIDE_SIZE;
 
                 (*p)[zLoc][yLoc][x] &= X_MASK;
-                //int32_t currentXLocation = ((*p)[zLoc][yLoc][x] & ~X_MASK) >> X_OFFSET;
-                //currentXLocation = ((currentXLocation - key[y]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
                 int32_t currentXLocation = ((x - key[y]) + RUBIX_SIDE_SIZE) % RUBIX_SIDE_SIZE;
                 (*p)[zLoc][yLoc][x] |= (currentXLocation << X_OFFSET);
             }
@@ -644,10 +598,7 @@ bool writeFile(std::string outputFile, std::vector < T > & fileBuffer)
             break;
 
         std::cout << "Enter new Filename: ";
-        std::cin >> outputFile;
-
-        // Ignore to the end of line
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::getline(std::cin, outputFile);
 
         // reset the stream state.
         std::cin.clear();
@@ -675,6 +626,12 @@ bool writeFile(std::string outputFile, std::vector < T > & fileBuffer)
 }
 
 #if TIMER
+/*
+ * This function prints the time for each stage.
+ * 
+ * @param   none
+ * @return  none
+ */
 void writeTimeStats()
 {
     std::array<std::string, 6> labels = { {"XOR = ", "HUFFMAN = ","RUBIX = ","SHUFFLE = ","WRITE = "} };
@@ -744,9 +701,10 @@ int main(int argc, char **argv)
      * end of cleartext 
      */
     std::vector<uint8_t> fileBuffer = { 0 };
-    int maxSize = (commandLineOptions["direction"] == "encode") ? TWELVE_MEGABYTES : SIXTEEN_MEGABYTES;
+    int maxSize = (commandLineOptions["direction"] == "encode") ? TWELVE_MEGABYTES : SIXTEEN_MEGABYTES
+      , minSize = (commandLineOptions["direction"] == "encode") ? 0 : SIXTEEN_MEGABYTES;
 
-    if (readFile(commandLineOptions["encryptFile"], fileBuffer, 0, maxSize) == false)
+    if (readFile(commandLineOptions["encryptFile"], fileBuffer, minSize, maxSize) == false)
     {
         std::cerr << "Error with input file." << std::endl;
         exit(-1);
