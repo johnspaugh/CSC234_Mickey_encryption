@@ -50,7 +50,17 @@ bool parseOptions(int argc, char** argv, std::map<std::string, std::string>& com
 {
     for (int i = 1; i < argc; i++)
     {
-        if (std::strcmp(argv[i], "-k") == 0)
+        /*
+        * to get around case difficulties, we convert the argv into a std::string, then make
+        * it lower case to compare. this also gets us around the strcmp anomaly in other
+        * compilers.
+        */
+        std::string input(argv[i]);
+        std::transform(input.begin(), input.end(), input.begin(), 
+            [](unsigned char c) { return std::tolower(c); }
+        );
+
+        if (input == "-k")
         {
             if (i + 1 >= argc)
             {
@@ -61,7 +71,7 @@ bool parseOptions(int argc, char** argv, std::map<std::string, std::string>& com
                 commandLineOptions["keyFile"] = argv[i + 1];
             }
         }
-        else if (std::strcmp(argv[i], "-f") == 0)
+        else if (input == "-f")
         {
             if (i + 1 >= argc)
             {
@@ -72,9 +82,9 @@ bool parseOptions(int argc, char** argv, std::map<std::string, std::string>& com
                 commandLineOptions["encryptFile"] = argv[i + 1];
             }
         }
-        else if (std::strcmp(argv[i], "-v") == 0)
+        else if (input == "-v")
             commandLineOptions["verbose"] = "true";
-        else if (std::strcmp(argv[i], "decode") == 0)
+        else if (input == "decode")
             commandLineOptions["direction"] = "decode";
     }
 
@@ -245,7 +255,7 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
 
     outputFilename += FILE_EXTENSION;
 
-    if (verbose)    std::cout << "XOR file and key." << std::endl;
+    update(verbose, ENCODE_XOR);
 
 #if TIMER
     times.push_back(std::chrono::steady_clock::now());
@@ -256,7 +266,7 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
      */
     XORFileAndKey(fileBuffer, key);
 
-    if (verbose)    std::cout << "Huffman Encoding." << std::endl;
+    update(verbose, ENCODE_HUFFMAN);
 
 #if TIMER
     times.push_back(std::chrono::steady_clock::now());
@@ -274,7 +284,7 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
         exit(1);
     }
 
-    if (verbose)    std::cout << "Rubix shuffle." << std::endl;
+    update(verbose, ENCODE_RUBIX);
 
 #if TIMER
     times.push_back(std::chrono::steady_clock::now());
@@ -339,7 +349,7 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
 
     std::sort(rubix.begin(), rubix.end());
 
-    if (verbose)    std::cout << "Shuffle array." << std::endl;
+    update(verbose, ENCODE_SHUFFLE);
 
 #if TIMER
     times.push_back(std::chrono::steady_clock::now());
@@ -358,7 +368,7 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     }
     std::sort(rubix.begin(), rubix.end());
 
-    if (verbose)    std::cout << "Write encrypted file." << std::endl;
+    update(verbose, ENCODE_WRITE_OUT);
 
 #if TIMER
     times.push_back(std::chrono::steady_clock::now());
@@ -376,8 +386,10 @@ bool encode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
 #if TIMER
     times.push_back(std::chrono::steady_clock::now());
 #endif
-    return true;
 
+    update(verbose, STAGE_END);
+
+    return true;
 }
 
 /*
@@ -406,7 +418,7 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
      * 3. Perform steps 9 & 10 to build the Shuffle map
      * 4. Reverse step 11 - move elements from the input array into the Rubix array
      */ 
-    if (verbose)    std::cout << "Unshuffle array." << std::endl;
+    update(verbose, DECODE_SHUFFLE);
 
 #if TIMER
     times.push_back(std::chrono::steady_clock::now());
@@ -419,7 +431,7 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
 
     std::sort(rubix.begin(), rubix.end());
 
-    if (verbose)    std::cout << "Rubix shuffle." << std::endl;
+    update(verbose, DECODE_RUBIX);
 #if TIMER
     times.push_back(std::chrono::steady_clock::now());
 #endif
@@ -461,7 +473,8 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     /*
      * 9. Perform Huffman decoding to create array from array (implement last)
      */
-    if (verbose)    std::cout << "Huffman decoding." << std::endl;
+    update(verbose, DECODE_HUFFMAN);
+
 #if TIMER
     times.push_back(std::chrono::steady_clock::now());
 #endif
@@ -502,7 +515,7 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
         exit(1);
     }
 
-    if (verbose)    std::cout << "XOR file and key." << std::endl;
+    update(verbose, DECODE_XOR);
 
 #if TIMER
     times.push_back(std::chrono::steady_clock::now());
@@ -520,7 +533,7 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
      *      1 byte for file name length
      *      file name
      */
-    if (verbose)    std::cout << "Write decrypted file." << std::endl;
+    update(verbose, DECODE_WRITE_OUT);
 #if TIMER
     times.push_back(std::chrono::steady_clock::now());
 #endif
@@ -554,7 +567,50 @@ bool decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool ve
     times.push_back(std::chrono::steady_clock::now());
 #endif
 
+    update(verbose, STAGE_END);
     return true;
+}
+
+/*
+ * This function updates the user depending on the verbose flag from user input
+ * borrowed from:
+ * https://stackoverflow.com/questions/14539867/how-to-display-a-progress-indicator-in-pure-c-c-cout-printf
+ *
+ * @param   verbose             whether to write string output or progress bar
+ * @param   stage               which stage to update
+ * @return  void
+*/
+void update(bool verbose, uint8_t stage)
+{
+    if (verbose)
+    {
+        switch (stage)
+        {
+            case 0: std::cout << "XOR file and key." << std::endl;  break;
+            case 1: std::cout << "Huffman Encoding." << std::endl;  break;
+            case 2: std::cout << "Rubix shuffle." << std::endl;     break;
+            case 3: std::cout << "Shuffle array." << std::endl;     break;
+            case 4: std::cout << "Write output file." << std::endl; break;
+            default:
+                ;
+        }
+    }
+    else
+    {
+        float progress = (float)(stage) / 5;
+        int barWidth = 70;
+
+        std::cout << "[";
+        int pos = (int)(barWidth * (progress));
+        for (int i = 0; i < barWidth; ++i) 
+        {
+            if (i < pos)        std::cout << "=";
+            else if (i == pos)  std::cout << ">";
+            else                std::cout << " ";
+        }
+        std::cout << "] " << int(progress * 100.0) << " %\r";
+        std::cout.flush();
+    }
 }
 
 /*
@@ -580,7 +636,7 @@ bool writeFile(std::string outputFile, std::vector < T > & fileBuffer)
      */
     while (std::filesystem::exists(outputFile))
     {
-        std::cout << outputFile << " already exists.";
+        std::cout << '\n' << outputFile << " already exists.";
         int ch;
         do
         {
@@ -640,7 +696,7 @@ void writeTimeStats()
     for (uint8_t i = 1; i < times.size(); i++)
     {
         std::chrono::duration<double> diff = times[i] - times[i-1];
-        std::cout << diff << '\t';
+        std::cout << diff<< '\t';
     }
 
     std::chrono::duration<double> diff = times[times.size()-1] - times[0];
@@ -732,9 +788,6 @@ int main(int argc, char **argv)
             std::cerr << "Error encoding file." << std::endl;
             exit(1);
         }
-#if TIMER
-        writeTimeStats();
-#endif
     }
     else
     {
@@ -743,10 +796,12 @@ int main(int argc, char **argv)
             std::cerr << "Error encoding file." << std::endl;
             exit(1);
         }
+    }
+
+    std::cout << std::endl;
 #if TIMER
         writeTimeStats();
 #endif
-    }
 
     return 0;
 }

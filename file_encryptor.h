@@ -23,8 +23,7 @@
  * currently, printing std::chrono::duration not supported by STL in all compilers
  * it's available in Microsoft Visual C++ compiler
  */
-#ifndef _WIN32_
-#include <cstring>
+#ifdef _WIN32_
 #define TIMER 1
 #if TIMER
 #include <chrono>
@@ -189,6 +188,20 @@ const char PI[] = "\x0\x1\x4\x1\x5\x9\x2\x6\x5\x3\x5\x8\x9\x7\x9\x3\x2\x3\x8\x4\
 	constexpr uint32_t Y_MASK			= 0XFF00FFFF;
 	constexpr uint32_t Z_MASK			= 0X00FFFFFF;
 
+	constexpr uint8_t ENCODE_XOR		= 0;
+	constexpr uint8_t ENCODE_HUFFMAN	= 1;
+	constexpr uint8_t ENCODE_RUBIX		= 2;
+	constexpr uint8_t ENCODE_SHUFFLE	= 3;
+	constexpr uint8_t ENCODE_WRITE_OUT	= 4;
+
+	constexpr uint8_t DECODE_SHUFFLE	= 0;
+	constexpr uint8_t DECODE_RUBIX		= 1;
+	constexpr uint8_t DECODE_HUFFMAN	= 2;
+	constexpr uint8_t DECODE_XOR		= 3;
+	constexpr uint8_t DECODE_WRITE_OUT	= 4;
+	
+	constexpr uint8_t STAGE_END			= 5;
+
 //Function prototypes
 void		addPadding(std::vector<uint32_t>& vec, uint32_t index);
 bool		decode(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key, bool verbose);
@@ -198,6 +211,7 @@ uint32_t	getPrime(uint8_t index);
 bool		parseOptions(int argc, char** argv, std::map<std::string, std::string>& command_line_options);
 void		printMatrix(std::string remark, std::vector<FILE_BUFFER_TYPE>& matrix3d);
 bool		readFile(std::string input_file, std::vector<uint8_t>& inputFileBuffer, uint32_t minSize, uint32_t maxSize);
+void		update(bool verbose, uint8_t stage);
 void		XORFileAndKey(std::vector<uint8_t>& fileBuffer, std::vector<uint8_t>& key);
 
 template <typename T>
